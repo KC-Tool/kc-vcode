@@ -377,7 +377,7 @@ export const tsSnippets: Snippet[] = [
   { label: 'errort', insert: 'throw new TypeError(${1:"message"})', detail: 'TypeError' },
   { label: 'errorref', insert: 'throw new ReferenceError(${1:"message"})', detail: 'ReferenceError' },
   { label: 'errorcs', insert: 'throw new SyntaxError(${1:"message"})', detail: 'SyntaxError' },
-  { label: 'customerr', insert: 'class ${1:Name}Error extends Error {\n\tconstructor(${2:message}: string) {\n\t\tsuper(${2:message})\n\t\tthis.name = '${1:Name}Error'\n\t}\n}', detail: 'custom error class' },
+  { label: 'customerr', insert: 'class ${1:Name}Error extends Error {\n\tconstructor(${2:message}: string) {\n\t\tsuper(${2:message})\n\t\t\n\t}\n}', detail: 'custom error class' },
 
   { label: 'debounce', insert: 'function debounce<${1:T extends (...args: any[]) => any}>(${1:fn}: ${1:T}, ${2:300}): ${1:T} {\n\tlet ${3:id}: ReturnType<typeof setTimeout>\n\treturn ((...${4:args}: any[]) => {\n\t\tclearTimeout(${3:id})\n\t\t${3:id} = setTimeout(() => ${1:fn}(...${4:args}), ${2:300})\n\t}) as ${1:T}\n}', detail: 'debounce' },
   { label: 'throttle', insert: 'function throttle<${1:T extends (...args: any[]) => any}>(${1:fn}: ${1:T}, ${2:1000}): ${1:T} {\n\tlet ${3:last} = 0\n\treturn ((...${4:args}: any[]) => {\n\t\tconst ${5:now} = Date.now()\n\t\tif (${5:now} - ${3:last} >= ${2:1000}) {\n\t\t\t${3:last} = ${5:now}\n\t\t\t${1:fn}(...${4:args})\n\t\t}\n\t}) as ${1:T}\n}', detail: 'throttle' },

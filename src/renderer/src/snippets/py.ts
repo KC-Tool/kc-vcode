@@ -139,7 +139,7 @@ export const pySnippets: Snippet[] = [
   { label: 'sxor', insert: '${1:set1} ^ ${2:set2}', detail: 'set symmetric difference' },
 
   { label: 'strf', insert: 'f"${1:text}"', detail: 'f-string' },
-  { label: 'strv', insert: f'f"${{1:value}}"' , detail: 'f-string variable' },
+  { label: 'strv', insert: "f'${value}'", detail: 'f-string variable' },
   { label: 'strk', insert: 'f"${1:key}: {${2:value}}"', detail: 'f-string key-value' },
   { label: 'strf', insert: 'f"${1:text:.${2:2f}}"', detail: 'f-string format' },
   { label: 'strjoin', insert: '"${1:sep}".join(${2:iterable})', detail: 'str join' },

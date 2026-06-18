@@ -173,7 +173,7 @@ export const jsSnippets: Snippet[] = [
   { label: 'str', insert: "'${1:text}'", detail: 'single quote string' },
   { label: 'strd', insert: '"${1:text}"', detail: 'double quote string' },
   { label: 'strt', insert: '`${1:text}`', detail: 'template literal' },
-  { label: 'strinter', insert: `\`\${${1:expr}}\``, detail: 'template interpolation' },
+  { label: 'strinter', insert: '`EXPR`', detail: 'template interpolation' },
   { label: 'strmulti', insert: '`\n\t${1:text}\n`', detail: 'multiline template' },
 
   { label: 'const', insert: 'const ${1:name} = ${2:value}', detail: 'const' },
