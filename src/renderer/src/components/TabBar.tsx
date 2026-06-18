@@ -1,14 +1,15 @@
 import React, { useRef, useEffect, useState } from 'react'
 import { useEditorContext } from '../contexts/EditorContext'
+import { useConfirm } from '../contexts/ConfirmContext'
 import { IconForFile } from '../utils/fileIcons'
 
 export default function TabBar() {
   const { state, setActiveTab, closeTab } = useEditorContext()
+  const { confirm } = useConfirm()
   const prevTabCount = useRef(state.tabs.length)
   const [entering, setEntering] = useState<string | null>(null)
   const [closing, setClosing] = useState<string | null>(null)
 
-  // detect newly added tab → enter animation
   useEffect(() => {
     if (state.tabs.length > prevTabCount.current && state.activeTabId) {
       setEntering(state.activeTabId)
@@ -21,10 +22,23 @@ export default function TabBar() {
 
   const handleClose = (tabId: string) => {
     const tab = state.tabs.find(t => t.id === tabId)
-    if (tab?.isDirty) {
-      if (!confirm(`"${tab.name}" has unsaved changes. Close anyway?`)) return
+    if (!tab) return
+    if (tab.isDirty) {
+      confirm({
+        title: 'Unsaved Changes',
+        message: `"${tab.name}" has unsaved changes. Close anyway?`,
+        okText: 'Close',
+        danger: true
+      }).then(ok => {
+        if (!ok) return
+        setClosing(tabId)
+        setTimeout(() => {
+          setClosing(null)
+          closeTab(tabId)
+        }, 200)
+      })
+      return
     }
-    // trigger close animation, then remove
     setClosing(tabId)
     setTimeout(() => {
       setClosing(null)

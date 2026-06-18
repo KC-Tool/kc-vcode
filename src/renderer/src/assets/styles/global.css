@@ -1524,3 +1524,107 @@ body {
   display: contents;
 }
 
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: confirm-fade-in 150ms var(--ease-out);
+}
+
+.confirm-dialog {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 24px 28px;
+  min-width: 360px;
+  max-width: 480px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  animation: confirm-pop-in 200ms var(--ease-spring);
+}
+
+.confirm-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fg-primary);
+  margin-bottom: 8px;
+}
+
+.confirm-message {
+  font-size: 13px;
+  color: var(--fg-secondary);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.confirm-btn {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 18px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  background: var(--bg-tertiary);
+  color: var(--fg-primary);
+  transition: background var(--duration-fast) var(--ease-out),
+              border-color var(--duration-fast) var(--ease-out),
+              transform var(--duration-fast) var(--ease-out);
+}
+
+.confirm-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--fg-muted);
+}
+
+.confirm-btn:active {
+  transform: translateY(1px);
+}
+
+.confirm-btn--ok {
+  background: var(--fg-primary);
+  color: var(--bg-primary);
+  border-color: var(--fg-primary);
+}
+
+.confirm-btn--ok:hover {
+  background: var(--bg-active);
+  color: var(--fg-primary);
+  border-color: var(--fg-primary);
+}
+
+.confirm-btn--danger {
+  background: var(--fg-danger);
+  color: #ffffff;
+  border-color: var(--fg-danger);
+}
+
+.confirm-btn--danger:hover {
+  filter: brightness(1.15);
+  border-color: var(--fg-danger);
+}
+
+@keyframes confirm-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes confirm-pop-in {
+  from { opacity: 0; transform: scale(0.92) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+

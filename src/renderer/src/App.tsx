@@ -1,6 +1,7 @@
 import React, { useEffect, useCallback, useState, useRef } from 'react'
 import { EditorProvider, useEditorContext } from './contexts/EditorContext'
 import { SettingsProvider, useSettings } from './contexts/SettingsContext'
+import { ConfirmProvider, useConfirm } from './contexts/ConfirmContext'
 import TabBar from './components/TabBar'
 import Sidebar from './components/Sidebar'
 import EditorPane from './components/Editor'
@@ -15,6 +16,7 @@ import './assets/styles/global.css'
 function AppContent() {
   const { state, openFile, setDirectory, closeTab, setTheme, openSettings } = useEditorContext()
   const { settings, loaded } = useSettings()
+  const { confirm } = useConfirm()
   const [tree, setTree] = useState<FileNode[]>([])
   const [termVisible, setTermVisible] = useState(false)
   const [paletteVisible, setPaletteVisible] = useState(false)
@@ -64,53 +66,57 @@ function AppContent() {
   }, [openFile, setDirectory, refreshTree])
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    // Command Palette: Ctrl+Shift+P
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'P') {
+    const mod = e.ctrlKey || e.metaKey
+    if (!mod) return
+
+    if (e.shiftKey && e.key === 'P') {
       e.preventDefault()
       setPaletteMode('command')
       setPaletteVisible(v => !v)
       return
     }
-    // Quick Open: Ctrl+P
-    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'p') {
+    if (!e.shiftKey && e.key === 'p') {
       e.preventDefault()
       setPaletteMode('file')
       setPaletteVisible(v => !v)
       return
     }
-    // Go to Line: Ctrl+G
-    if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
+    if (e.key === 'g') {
       e.preventDefault()
       setGoToLineVisible(true)
       return
     }
-    // Zen Mode: Ctrl+Shift+F11
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F11') {
+    if (e.shiftKey && e.key === 'F11') {
       e.preventDefault()
       setZenMode(v => !v)
       return
     }
-    // Terminal: Ctrl+`
-    if ((e.ctrlKey || e.metaKey) && e.key === '`') {
+    if (e.key === '`') {
       e.preventDefault()
       setTermVisible(v => !v)
       return
     }
-    // Settings: Ctrl+,
-    if ((e.ctrlKey || e.metaKey) && e.key === ',') {
+    if (e.key === ',') {
       e.preventDefault()
       openSettings()
       return
     }
-    // Close tab: Ctrl+W
-    if ((e.ctrlKey || e.metaKey) && e.key === 'w') {
+    if (e.key === 'w' && state.activeTabId) {
       e.preventDefault()
-      if (state.activeTabId) {
-        const tab = state.tabs.find(t => t.id === state.activeTabId)
-        if (tab?.isDirty && !confirm(`"${tab.name}" has unsaved changes. Close anyway?`)) return
-        closeTab(state.activeTabId)
+      const tab = state.tabs.find(t => t.id === state.activeTabId)
+      if (!tab) return
+      if (tab.isDirty) {
+        confirm({
+          title: 'Unsaved Changes',
+          message: `"${tab.name}" has unsaved changes. Close anyway?`,
+          okText: 'Close',
+          danger: true
+        }).then(ok => { if (ok) closeTab(state.activeTabId!) })
+        return
       }
+      closeTab(state.activeTabId)
     }
+  }, [state.activeTabId, state.tabs, closeTab, openSettings, confirm])
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown)
@@ -152,7 +158,6 @@ function AppContent() {
         visible={goToLineVisible}
         onClose={() => setGoToLineVisible(false)}
         onGo={(line) => {
-          // dispatch to editor
           document.dispatchEvent(new CustomEvent('editor:goToLine', { detail: line }))
         }}
         maxLine={9999}
@@ -165,7 +170,9 @@ export default function App() {
   return (
     <EditorProvider>
       <SettingsProvider>
-        <AppContent />
+        <ConfirmProvider>
+          <AppContent />
+        </ConfirmProvider>
       </SettingsProvider>
     </EditorProvider>
   )
