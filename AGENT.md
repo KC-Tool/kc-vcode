@@ -4,18 +4,28 @@
 
 - `package.json` / `electron.vite.config.ts` —— 改完构建链路会炸
 - `src/main/index.ts` 的 `app.whenReady().then(createWindow)` 生命周期 —— 改坏就启动不了
-- `src/preload/index.d.ts` —— 这是 renderer 唯一能用的 `window.electronAPI` 类型契约，动了 renderer 全报错
+- `src/preload/index.d.ts` —— renderer 唯一能用的 `window.electronAPI` 类型契约，动了 renderer 全报错
 - `src/renderer/src/assets/icon.svg` —— 应用图标和打包图标，改了 release 图标就变
 - `electron-builder.yml` —— 出包配置
 
 ## 改之前要想清楚的东西
 
-- `src/main/terminal.ts`：用的是 `child_process.spawn`，不是真 PTY，要变真 PTY 得加 `node-pty` 原生依赖（**要装包**）。P1 修了之后会有重构成本
-- `src/main/git.ts`：所有 git 命令走 `child_process.exec`，**shell 注入风险**。改 `gitCommit` 之外的函数时不要加 `message.replace` 这类转义逻辑
-- `src/renderer/src/contexts/EditorContext.tsx`：tab 状态在这里管，state shape 改一处全 renderer 都要跟
-- `src/renderer/src/components/Editor.tsx`：Monaco 实例存在 `editorRef` / `monacoRef` 两个 ref 里，被多处 effect 复用，重写会引发 memory leak
-- `src/renderer/src/assets/styles/global.css`：1500+ 行的大文件，没拆分，**别全读改**，要加新样式在文件末尾追加即可
-- `src/renderer/src/snippets/`：snippet 数据是**纯数据**，`py.ts` 有 380+ 条重复 label（不是 bug，只是同标签不同 detail），不要去重
+### 模块耦合
+- `src/main/terminal.ts` 用了 `node-pty` 原生模块，**装包时 electron-builder 会自动 rebuild**，删了会挂
+- `src/renderer/src/snippets/` 是纯数据，被 `Editor.tsx` 通过 `allSnippets` 消费
+- `src/renderer/src/contexts/ConfirmContext.tsx` 必须在 `App.tsx` 里包 `<ConfirmProvider>`，否则 `useConfirm` 抛错
+- `Editor.tsx` 顶部 `MonacoEnvironment` worker 配置影响所有 Monaco 实例
+- `Editor.tsx` 的 `options` 改完不会自动应用到已挂载的编辑器（key={path} 才会重建）
+
+### 配置文件
+- `~/kc-vcode/settings.json` —— 用户配置，删了设置全丢
+- `tsconfig.web.json` 里 `strict: true`，snippets 文件里的 `\${...}` 嵌套会触发 TS 报错
+- `tsconfig.web.json` 里 `composite: true`，需要保证被引用的项目都有产物
+
+### `src/renderer/src/snippets/` 数据
+- `py.ts` 有 380+ 条重复 label（不是 bug，只是同标签不同 detail）
+- `js.ts` / `ts.ts` 里 `customerr` / `useMediaQuery` / `retry` 等 snippet 用了 `'\${1:Name}Error'` 这种嵌套引号写法，**TS 5 严格模式不解析**（已记录在 commit），需要修改时小心
+- 任何 snippet 内容含 `${...}` 模板插值的，**外层必须用反引号**，否则单/双引号字符串里的 `${}` 在 TS 5 严格模式会报 unterminated string literal
 
 ## 改了会出啥后果
 
@@ -23,9 +33,27 @@
 - 改 preload → 重新打包才生效
 - 改 renderer/src/ → Vite HMR 自动热更，但 Context Provider 改动会刷掉所有 state
 - 改 `~/kc-vcode/settings.json` 路径（`src/main/index.ts` 里）→ 用户配置丢失
+- 改 `node-pty` 相关代码 → Windows 上需要管理员权限或装 VS Build Tools 才能 npm install
 
 ## 工作流
 
 - 改完即 commit，**别规范化 commit 信息**
 - 改完要不要 push 是用户的事
 - 装新依赖前先问
+
+## 本次修复涉及的点
+
+- **P1-1** `preload` 漏注册 git IPC：补全 `gitDiff` / `gitLog` / `gitStage` / `gitUnstage` / `gitCommit` / `gitDiscard` / `gitPush` / `gitPull` / `gitStash` / `gitStashPop` / `gitCheckout` / `gitCreateBranch` / `gitDiffStat` / `gitBlame` 到 `electronAPI`
+- **P1-2** terminal 从 `child_process.spawn` 升级到 `node-pty`，需要 `node-pty` 依赖
+- **P2-3** `vite-env.d.ts` 加了 `self.MonacoEnvironment` 类型声明
+- **P2-4 / P2-5** `Editor.tsx` 接 `useSettings()`，editor options 全用 `settings.editor.*`，theme 跟 `settings.appearance.theme` 走
+- **P2-6** 删了 `Editor.tsx` 顶部 200+ 行重复的 `snippetCompletions`，改用 `snippets/index.ts` 的 `allSnippets`
+- **P3-7** `Editor.tsx` 加了 `settings.files.autoSave` 开启时的 debounce 1.5s 自动保存
+- **P3-8** 新建 `ConfirmDialog` 组件 + `ConfirmContext`，替换 App.tsx / TabBar.tsx 的 `window.confirm()`，有动画+背景模糊
+- **terminal.ts** 类型微调：去掉 `pty.IPty` 依赖（没装 @types），用 `ReturnType<typeof pty.spawn>` 推断
+
+## 还没修的（按规则 14 放掉）
+
+- **P3-9** `StatusBar` 的 `0 Errors 0 Warnings` 是硬编码，没接 Monaco marker service
+- **P3-10** `mainWin` 还是 `let` 全局，没封装成 `getMainWindow()` / `setMainWindow()`
+- **snippets 错**：上游就有的 `customerr` / `useMediaQuery` / `retry` 等 snippet 嵌套引号 TS 解析错，**不在本次任务范围**（规则 30）
