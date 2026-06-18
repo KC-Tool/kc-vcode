@@ -1,6 +1,6 @@
 import * as pty from 'node-pty'
 
-let proc: pty.IPty | null = null
+let proc: ReturnType<typeof pty.spawn> | null = null
 
 const SHELL = process.platform === 'win32' ? 'powershell.exe' : 'bash'
 const SHELL_ARGS: string[] = process.platform === 'win32' ? ['-NoLogo'] : ['--login']
@@ -17,8 +17,8 @@ export function createPty(cwd: string, onData: (data: string) => void): { pid: n
     useConpty: process.platform === 'win32'
   })
 
-  proc.onData((d) => onData(d))
-  proc.onExit(({ exitCode }) => {
+  proc.onData((d: string) => onData(d))
+  proc.onExit(({ exitCode }: { exitCode: number }) => {
     if (proc) onData(`\r\n\x1b[90m[process exited with code ${exitCode}]\x1b[0m\r\n`)
     proc = null
   })
