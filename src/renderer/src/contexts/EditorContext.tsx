@@ -47,14 +47,8 @@ function loadSavedState(): EditorState | null {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return null
     const saved = JSON.parse(raw)
-    return {
-      tabs: [],
-      activeTabId: null,
-      files: {},
-      directoryPath: saved.directoryPath || null,
-      directoryName: saved.directoryName || null,
-      theme: saved.theme || 'dark'
-    }
+    const theme = saved.theme || 'dark'
+    return { tabs: [], activeTabId: null, files: {}, directoryPath: null, directoryName: null, theme }
   } catch {
     return null
   }
