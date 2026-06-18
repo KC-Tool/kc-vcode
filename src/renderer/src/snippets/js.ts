@@ -434,7 +434,7 @@ export const jsSnippets: Snippet[] = [
   { label: 'errort', insert: 'throw new TypeError(${1:"message"})', detail: 'TypeError' },
   { label: 'errorr', insert: 'throw new ReferenceError(${1:"message"})', detail: 'ReferenceError' },
   { label: 'errorcs', insert: 'throw new SyntaxError(${1:"message"})', detail: 'SyntaxError' },
-  { label: 'customerr', insert: 'class ${1:Name}Error extends Error {\n\tconstructor(${2:message}) {\n\t\tsuper(${2:message})\n\t\tthis.name = '${1:Name}Error'\n\t}\n}', detail: 'custom error class' },
+  { label: 'customerr', insert: 'class ${1:Name}Error extends Error {\n\tconstructor(${2:message}) {\n\t\tsuper(${2:message})\n\t}\n}', detail: 'custom error class' },
 
   { label: 'noop', insert: '() => {}', detail: 'no-op' },
   { label: 'identity', insert: '(x) => x', detail: 'identity function' },
@@ -471,7 +471,6 @@ export const jsSnippets: Snippet[] = [
   { label: 'clg3', insert: 'console.log(${1:a}, ${2:b}, ${3:c})', detail: 'log 3 args' },
   { label: 'clgo', insert: 'console.log(${1:obj})', detail: 'log object' },
   { label: 'clga', insert: 'console.log(${1:arr})', detail: 'log array' },
-  { label: 'clgt', insert: `console.log('${1:text}')`, detail: 'log string' },
   { label: 'clgm', insert: 'console.log("${1:message}:", ${2:value})', detail: 'log with label' },
 
   { label: 'dce', insert: "document.createElement('${1:tag}')", detail: 'create element' },

@@ -388,7 +388,7 @@ export const tsSnippets: Snippet[] = [
   { label: 'noop', insert: '(): void => {}', detail: 'no-op' },
   { label: 'identity', insert: '(x: ${1:T}): ${1:T} => x', detail: 'identity' },
 
-  { label: 'retry', insert: 'async function retry<${1:T}>(${2:fn}: () => Promise<${1:T}>, ${3:3}, ${4:1000}): Promise<${1:T}> {\n\tfor (let ${5:i} = 0; ${5:i} < ${3:3}; ${5:i}++) {\n\t\ttry {\n\t\t\treturn await ${2:fn}()\n\t\t} catch (${6:err}: unknown) {\n\t\t\tif (${5:i} === ${3:3} - 1) throw ${6:err}\n\t\t\tawait new Promise(${7:r} => setTimeout(${7:r}, ${4:1000} * ${5:i}))\n\t\t}\n\t}\n\tthrow new Error('unreachable')\n}', detail: 'retry' },
+  { label: 'retry', insert: 'async function retry<${1:T}>(${2:fn}: () => Promise<${1:T}>, ${3:3}, ${4:1000}): Promise<${1:T}> {\n\tfor (let ${5:i} = 0; ${5:i} < ${3:3}; ${5:i}++) {\n\t\ttry {\n\t\t\treturn await ${2:fn}()\n\t\t} catch (${6:err}: unknown) {\n\t\t\tif (${5:i} === ${3:3} - 1) throw ${6:err}\n\t\t\tawait new Promise(${7:r} => setTimeout(${7:r}, ${4:1000} * ${5:i}))\n\t\t}\n\t}\n\tthrow new Error(0 as never)\n}', detail: 'retry' },
   { label: 'delay', insert: 'const delay = (${1:ms}: number): Promise<void> => new Promise(${2:r} => setTimeout(${2:r}, ${1:ms}))', detail: 'delay' },
 
   { label: 'env', insert: 'process.env.${1:KEY}', detail: 'process.env' },
@@ -418,8 +418,6 @@ export const tsSnippets: Snippet[] = [
   { label: 'useLayoutEffect', insert: 'useLayoutEffect(() => {\n\t${1:// effect}\n}, [${2:deps}])', detail: 'useLayoutEffect' },
   { label: 'usedebounce', insert: 'const [debouncedValue, setDebouncedValue] = useState<${1:type}>(${2:value})\n\nuseEffect(() => {\n\tconst timer = setTimeout(() => setDebouncedValue(${2:value}), ${3:300})\n\treturn () => clearTimeout(timer)\n}, [${2:value}])', detail: 'debounce pattern' },
   { label: 'usethrottle', insert: 'const lastRun = useRef(Date.now())\n\nuseEffect(() => {\n\tconst timeout = setTimeout(() => {\n\t\tif (Date.now() - lastRun.current >= ${1:1000}) {\n\t\t\t${2:// handler}\n\t\t\tlastRun.current = Date.now()\n\t\t}\n\t}, ${1:1000} - (Date.now() - lastRun.current))\n\treturn () => clearTimeout(timeout)\n}, [${3:deps}])', detail: 'throttle pattern' },
-  { label: 'useClickOutside', insert: "const ${1:ref} = useRef<HTMLDivElement>(null)\n\nuseEffect(() => {\n\tconst ${2:handler} = (${3:e}: MouseEvent) => {\n\t\tif (${1:ref}.current && !${1:ref}.current.contains(${3:e}.target as Node)) {\n\t\t\t${4:// close}\n\t\t}\n\t}\n\tdocument.addEventListener('mousedown', ${2:handler})\n\treturn () => document.removeEventListener('mousedown', ${2:handler})\n}, [])', detail: 'useClickOutside' },
-  { label: 'useMediaQuery', insert: "const ${1:matches} = (() => {\n\tconst [${2:m}, set${2/(.*)/${1:/capitalize}/}] = useState(window.matchMedia('${3:query}').matches)\n\tuseEffect(() => {\n\t\tconst ${4:mq} = window.matchMedia('${3:query}')\n\t\tconst ${5:handler} = (${4:e}: MediaQueryListEvent) => set${2/(.*)/${1:/capitalize}/}(${4:e}.matches)\n\t\t${4:mq}.addEventListener('change', ${5:handler})\n\t\treturn () => ${4:mq}.removeEventListener('change', ${5:handler})\n\t}, [])\n\treturn ${2:m}\n})()', detail: 'useMediaQuery' },
 
   { label: 'ipcHandle', insert: "ipcMain.handle('${1:channel}', async (_, ${2:args}) => {\n\t${3:// handler}\n})", detail: 'ipcMain.handle' },
   { label: 'ipcOn', insert: "ipcMain.on('${1:channel}', (_, ${2:args}) => {\n\t${3:// handler}\n})", detail: 'ipcMain.on' },
