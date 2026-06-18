@@ -47,22 +47,13 @@ function loadSavedState(): EditorState | null {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return null
     const saved = JSON.parse(raw)
-    // clear file contents on restore to save memory — user must re-open
-    const files: Record<string, FileData> = {}
-    for (const [k, v] of Object.entries(saved.files || {})) {
-      const f = v as FileData
-      files[k] = { ...f, content: '', originalContent: '' }
-    }
-    // filter out settings tab — don't restore it
-    const tabs = (saved.tabs || [])
-      .filter((t: Tab) => !t.isSettings && t.id !== '__settings__')
-      .map((t: Tab) => ({ ...t, isDirty: false }))
-    const activeTabId = tabs.find((t: Tab) => t.id === saved.activeTabId) ? saved.activeTabId : tabs[0]?.id || null
     return {
-      ...saved,
-      files,
-      tabs,
-      activeTabId
+      tabs: [],
+      activeTabId: null,
+      files: {},
+      directoryPath: saved.directoryPath || null,
+      directoryName: saved.directoryName || null,
+      theme: saved.theme || 'dark'
     }
   } catch {
     return null
