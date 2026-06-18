@@ -3,12 +3,19 @@ import { useEditorContext } from '../contexts/EditorContext'
 import { useConfirm } from '../contexts/ConfirmContext'
 import { IconForFile } from '../utils/fileIcons'
 
+interface ContextMenu {
+  tabId: string
+  x: number
+  y: number
+}
+
 export default function TabBar() {
-  const { state, setActiveTab, closeTab } = useEditorContext()
+  const { state, setActiveTab, closeTab, closeAllTabs } = useEditorContext()
   const { confirm } = useConfirm()
   const prevTabCount = useRef(state.tabs.length)
   const [entering, setEntering] = useState<string | null>(null)
   const [closing, setClosing] = useState<string | null>(null)
+  const [ctx, setCtx] = useState<ContextMenu | null>(null)
 
   useEffect(() => {
     if (state.tabs.length > prevTabCount.current && state.activeTabId) {
@@ -19,6 +26,18 @@ export default function TabBar() {
     }
     prevTabCount.current = state.tabs.length
   }, [state.tabs.length, state.activeTabId])
+
+  useEffect(() => {
+    if (ctx) {
+      const close = () => setCtx(null)
+      document.addEventListener('click', close)
+      document.addEventListener('contextmenu', close)
+      return () => {
+        document.removeEventListener('click', close)
+        document.removeEventListener('contextmenu', close)
+      }
+    }
+  }, [ctx])
 
   const handleClose = (tabId: string) => {
     const tab = state.tabs.find(t => t.id === tabId)
@@ -32,19 +51,45 @@ export default function TabBar() {
       }).then(ok => {
         if (!ok) return
         setClosing(tabId)
-        setTimeout(() => {
-          setClosing(null)
-          closeTab(tabId)
-        }, 200)
+        setTimeout(() => { setClosing(null); closeTab(tabId) }, 200)
       })
       return
     }
     setClosing(tabId)
-    setTimeout(() => {
-      setClosing(null)
-      closeTab(tabId)
-    }, 200)
+    setTimeout(() => { setClosing(null); closeTab(tabId) }, 200)
   }
+
+  const closeOthers = (tabId: string) => {
+    state.tabs.forEach(t => { if (t.id !== tabId) closeTab(t.id) })
+  }
+
+  const closeAll = () => { closeAllTabs() }
+
+  const closeRight = (tabId: string) => {
+    const idx = state.tabs.findIndex(t => t.id === tabId)
+    if (idx === -1) return
+    state.tabs.slice(idx + 1).forEach(t => closeTab(t.id))
+  }
+
+  const closeLeft = (tabId: string) => {
+    const idx = state.tabs.findIndex(t => t.id === tabId)
+    if (idx <= 0) return
+    state.tabs.slice(0, idx).forEach(t => closeTab(t.id))
+  }
+
+  const closeSaved = () => {
+    state.tabs.filter(t => !t.isDirty).forEach(t => closeTab(t.id))
+  }
+
+  const copyPath = (tabId: string) => { navigator.clipboard.writeText(tabId) }
+
+  const handleContextMenu = (e: React.MouseEvent, tabId: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setCtx({ tabId, x: e.clientX, y: e.clientY })
+  }
+
+  const tab = ctx ? state.tabs.find(t => t.id === ctx.tabId) : null
 
   return (
     <div className="tab-bar">
@@ -63,6 +108,7 @@ export default function TabBar() {
               key={tab.id}
               className={cls}
               onClick={() => setActiveTab(tab.id)}
+              onContextMenu={(e) => handleContextMenu(e, tab.id)}
               title={tab.id}
             >
               <span className="tab-icon">
@@ -82,6 +128,24 @@ export default function TabBar() {
           )
         })}
       </div>
+
+      {ctx && tab && (
+        <div
+          className="ctx-menu"
+          style={{ left: ctx.x, top: ctx.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="ctx-menu-item" onClick={() => { handleClose(ctx.tabId); setCtx(null) }}>Close</div>
+          <div className="ctx-menu-item" onClick={() => { closeOthers(ctx.tabId); setCtx(null) }}>Close Others</div>
+          <div className="ctx-menu-item" onClick={() => { closeRight(ctx.tabId); setCtx(null) }}>Close Right</div>
+          <div className="ctx-menu-item" onClick={() => { closeLeft(ctx.tabId); setCtx(null) }}>Close Left</div>
+          <div className="ctx-menu-item" onClick={() => { closeSaved(); setCtx(null) }}>Close Saved</div>
+          <div className="ctx-menu-item" onClick={() => { closeAll(); setCtx(null) }}>Close All</div>
+          <div className="ctx-menu-sep" />
+          <div className="ctx-menu-item" onClick={() => { copyPath(ctx.tabId); setCtx(null) }}>Copy Path</div>
+          <div className="ctx-menu-item" onClick={() => { navigator.clipboard.writeText(tab.path || ctx.tabId); setCtx(null) }}>Copy Relative Path</div>
+        </div>
+      )}
     </div>
   )
 }
