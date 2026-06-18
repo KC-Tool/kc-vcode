@@ -2,6 +2,8 @@ import React, { useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import mermaid from 'mermaid'
+import hljs from 'highlight.js'
+import 'highlight.js/styles/github-dark.css'
 
 mermaid.initialize({
   startOnLoad: false,
@@ -31,6 +33,28 @@ function MermaidBlock({ code }: { code: string }) {
   return <div ref={ref} className="mermaid-block" />
 }
 
+function CodeBlock({ className, children, ...rest }: React.HTMLAttributes<HTMLElement>) {
+  const ref = useRef<HTMLElement>(null)
+  const match = /language-(\w+)/.exec(className || '')
+  const lang = match?.[1]
+  const text = String(children).replace(/\n$/, '')
+
+  useEffect(() => {
+    if (!ref.current) return
+    if (lang && hljs.getLanguage(lang)) {
+      ref.current.innerHTML = hljs.highlight(text, { language: lang }).value
+    } else {
+      ref.current.textContent = text
+    }
+  }, [text, lang])
+
+  return (
+    <pre className={className} style={{ position: 'relative' }}>
+      <code ref={ref} className={className} {...rest} />
+    </pre>
+  )
+}
+
 export default function MarkdownPreview({ content, theme = 'dark' }: Props) {
   useEffect(() => {
     mermaid.initialize({
@@ -47,7 +71,7 @@ export default function MarkdownPreview({ content, theme = 'dark' }: Props) {
           remarkPlugins={[remarkGfm]}
           components={{
             code(props) {
-              const { children, className, ...rest } = props
+              const { className, children, ...rest } = props
               const match = /language-(\w+)/.exec(className || '')
               const lang = match?.[1]
               const text = String(children).replace(/\n$/, '')
@@ -56,11 +80,11 @@ export default function MarkdownPreview({ content, theme = 'dark' }: Props) {
                 return <MermaidBlock code={text} />
               }
 
-              return (
-                <code className={className} {...rest}>
-                  {children}
-                </code>
-              )
+              if (lang) {
+                return <CodeBlock className={className} {...rest}>{children}</CodeBlock>
+              }
+
+              return <code className={className} {...rest}>{children}</code>
             }
           }}
         >
