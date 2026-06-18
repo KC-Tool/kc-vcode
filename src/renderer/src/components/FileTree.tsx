@@ -25,9 +25,6 @@ function FileTreeItem({ node, onFileClick, depth = 0 }: { node: FileNode; onFile
         onClick={handleClick}
         title={node.path}
       >
-        {isDir && (
-          <span className={`file-tree-arrow${expanded ? ' file-tree-arrow--expanded' : ''}`}>▶</span>
-        )}
         <span className="file-tree-icon">
           {isDir
             ? <IconForFolder open={expanded} />
