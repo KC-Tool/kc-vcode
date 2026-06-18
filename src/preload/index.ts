@@ -1,0 +1,158 @@
+import { contextBridge, ipcRenderer } from 'electron'
+
+export interface FileNode {
+  name: string
+  path: string
+  type: 'file' | 'directory'
+  children?: FileNode[]
+  language?: string
+}
+
+export interface ElectronAPI {
+  openDirectory: () => Promise<{
+    rootName: string
+    rootPath: string
+    tree: FileNode[]
+  } | null>
+  openFilePicker: () => Promise<{
+    path: string
+    name: string
+    content: string
+    language: string
+  } | null>
+  openFile: (filePath: string) => Promise<{ content: string; language: string } | { error: string }>
+  saveFile: (data: { path: string; content: string }) => Promise<{ success: boolean } | { error: string }>
+  readDir: (dirPath: string) => Promise<{ tree: FileNode[] } | { error: string }>
+  setTitle: (title: string) => void
+  onDirectoryOpened: (callback: (data: { rootName: string; rootPath: string; tree: FileNode[] }) => void) => void
+  onDirectoryRefreshed: (callback: () => void) => void
+  onFileOpenedByMenu: (callback: (data: { path: string; name: string; content: string; language: string }) => void) => void
+  onRequestSave: (callback: () => void) => void
+  removeAllListeners: (channel: string) => void
+  createTerminal: (cwd?: string) => Promise<{ pid: number }>
+  terminalInput: (data: string) => void
+  terminalResize: (cols: number, rows: number) => void
+  onTerminalData: (cb: (data: string) => void) => void
+  refreshDir: (dirPath: string) => Promise<{ tree: FileNode[] } | { error: string }>
+  loadSettings: () => Promise<Record<string, unknown> | null>
+  saveSettings: (data: Record<string, unknown>) => Promise<boolean>
+  createFile: (dirPath: string, name: string) => Promise<{ success?: boolean; path?: string; error?: string }>
+  createFolder: (dirPath: string, name: string) => Promise<{ success?: boolean; path?: string; error?: string }>
+  gitStatus: (cwd: string) => Promise<any>
+  gitDiff: (cwd: string, filePath?: string) => Promise<string>
+  gitLog: (cwd: string, count?: number) => Promise<any[]>
+  gitStage: (cwd: string, filePath: string) => Promise<void>
+  gitUnstage: (cwd: string, filePath: string) => Promise<void>
+  gitCommit: (cwd: string, message: string) => Promise<string>
+  gitDiscard: (cwd: string, filePath: string) => Promise<void>
+  gitBranches: (cwd: string) => Promise<string[]>
+  gitPush: (cwd: string) => Promise<string>
+  gitPull: (cwd: string) => Promise<string>
+  gitStash: (cwd: string) => Promise<string>
+  gitStashPop: (cwd: string) => Promise<string>
+  gitCheckout: (cwd: string, branch: string) => Promise<string>
+  gitCreateBranch: (cwd: string, name: string) => Promise<string>
+  gitDiffStat: (cwd: string) => Promise<any[]>
+  gitBlame: (cwd: string, filePath: string) => Promise<any[]>
+}
+
+declare global {
+  interface Window {
+    electronAPI: ElectronAPI
+  }
+}
+
+const electronAPI = {
+  openDirectory: (): Promise<{
+    rootName: string
+    rootPath: string
+    tree: FileNode[]
+  } | null> => ipcRenderer.invoke('dialog:openDirectory'),
+
+  openFilePicker: (): Promise<{
+    path: string; name: string; content: string; language: string
+  } | null> => ipcRenderer.invoke('dialog:openFile'),
+
+  openFile: (filePath: string): Promise<{ content: string; language: string } | { error: string }> =>
+    ipcRenderer.invoke('file:open', filePath),
+
+  saveFile: (data: { path: string; content: string }): Promise<{ success: boolean } | { error: string }> =>
+    ipcRenderer.invoke('file:save', data),
+
+  readDir: (dirPath: string): Promise<{ tree: FileNode[] } | { error: string }> =>
+    ipcRenderer.invoke('file:readDir', dirPath),
+
+  setTitle: (title: string): void => {
+    ipcRenderer.invoke('window:setTitle', title)
+  },
+
+  onDirectoryOpened: (callback: (data: { rootName: string; rootPath: string; tree: FileNode[] }) => void): void => {
+    ipcRenderer.on('directory:opened', (_, data) => callback(data))
+  },
+
+  onDirectoryRefreshed: (callback: () => void): void => {
+    ipcRenderer.on('directory:refreshed', () => callback())
+  },
+
+  onFileOpenedByMenu: (callback: (data: { path: string; name: string; content: string; language: string }) => void): void => {
+    ipcRenderer.on('file:opened', (_, data) => callback(data))
+  },
+
+  onRequestSave: (callback: () => void): void => {
+    ipcRenderer.on('file:requestSave', () => callback())
+  },
+
+  removeAllListeners: (channel: string): void => {
+    ipcRenderer.removeAllListeners(channel)
+  },
+
+  // terminal
+  createTerminal: (cwd?: string): Promise<{ pid: number }> =>
+    ipcRenderer.invoke('terminal:create', { cwd }),
+
+  terminalInput: (data: string): void => {
+    ipcRenderer.invoke('terminal:input', data)
+  },
+
+  terminalResize: (cols: number, rows: number): void => {
+    ipcRenderer.invoke('terminal:resize', cols, rows)
+  },
+
+  onTerminalData: (cb: (data: string) => void): void => {
+    ipcRenderer.on('terminal:data', (_, data) => cb(data))
+  },
+
+  refreshDir: (dirPath: string): Promise<{ tree: FileNode[] } | { error: string }> =>
+    ipcRenderer.invoke('file:refreshDir', dirPath),
+
+  loadSettings: (): Promise<Record<string, unknown> | null> =>
+    ipcRenderer.invoke('settings:load'),
+
+  saveSettings: (data: Record<string, unknown>): Promise<boolean> =>
+    ipcRenderer.invoke('settings:save', data),
+
+  createFile: (dirPath: string, name: string): Promise<{ success?: boolean; path?: string; error?: string }> =>
+    ipcRenderer.invoke('file:create', { dirPath, name }),
+
+  createFolder: (dirPath: string, name: string): Promise<{ success?: boolean; path?: string; error?: string }> =>
+    ipcRenderer.invoke('folder:create', { dirPath, name }),
+
+  gitStatus: (cwd: string) => ipcRenderer.invoke('git:status', cwd),
+  gitDiff: (cwd: string, filePath?: string) => ipcRenderer.invoke('git:diff', cwd, filePath),
+  gitLog: (cwd: string, count?: number) => ipcRenderer.invoke('git:log', cwd, count),
+  gitStage: (cwd: string, filePath: string) => ipcRenderer.invoke('git:stage', cwd, filePath),
+  gitUnstage: (cwd: string, filePath: string) => ipcRenderer.invoke('git:unstage', cwd, filePath),
+  gitCommit: (cwd: string, message: string) => ipcRenderer.invoke('git:commit', cwd, message),
+  gitDiscard: (cwd: string, filePath: string) => ipcRenderer.invoke('git:discard', cwd, filePath),
+  gitBranches: (cwd: string) => ipcRenderer.invoke('git:branches', cwd),
+  gitPush: (cwd: string) => ipcRenderer.invoke('git:push', cwd),
+  gitPull: (cwd: string) => ipcRenderer.invoke('git:pull', cwd),
+  gitStash: (cwd: string) => ipcRenderer.invoke('git:stash', cwd),
+  gitStashPop: (cwd: string) => ipcRenderer.invoke('git:stashPop', cwd),
+  gitCheckout: (cwd: string, branch: string) => ipcRenderer.invoke('git:checkout', cwd, branch),
+  gitCreateBranch: (cwd: string, name: string) => ipcRenderer.invoke('git:createBranch', cwd, name),
+  gitDiffStat: (cwd: string) => ipcRenderer.invoke('git:diffStat', cwd),
+  gitBlame: (cwd: string, filePath: string) => ipcRenderer.invoke('git:blame', cwd, filePath)
+}
+
+contextBridge.exposeInMainWorld('electronAPI', electronAPI)
