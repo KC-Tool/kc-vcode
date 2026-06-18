@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react'
 import { useEditorContext } from '../contexts/EditorContext'
 import { useConfirm } from '../contexts/ConfirmContext'
+import { useSettings } from '../contexts/SettingsContext'
 import { IconForFile } from '../utils/fileIcons'
 
 interface ContextMenu {
@@ -12,10 +13,12 @@ interface ContextMenu {
 export default function TabBar() {
   const { state, setActiveTab, closeTab, closeAllTabs } = useEditorContext()
   const { confirm } = useConfirm()
+  const { settings } = useSettings()
   const prevTabCount = useRef(state.tabs.length)
   const [entering, setEntering] = useState<string | null>(null)
   const [closing, setClosing] = useState<string | null>(null)
   const [ctx, setCtx] = useState<ContextMenu | null>(null)
+  const blur = settings.appearance.tabBlur
 
   useEffect(() => {
     if (state.tabs.length > prevTabCount.current && state.activeTabId) {
@@ -110,6 +113,7 @@ export default function TabBar() {
               onClick={() => setActiveTab(tab.id)}
               onContextMenu={(e) => handleContextMenu(e, tab.id)}
               title={tab.id}
+              style={!isActive && blur > 0 ? { backdropFilter: `blur(${blur}px)`, WebkitBackdropFilter: `blur(${blur}px)` } : undefined}
             >
               <span className="tab-icon">
                 {tab.isSettings

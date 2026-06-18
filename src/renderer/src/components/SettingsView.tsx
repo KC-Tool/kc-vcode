@@ -90,6 +90,14 @@ export default function SettingsView() {
                 value={settings.appearance.fontSize}
                 onChange={e => update('appearance', 'fontSize', +e.target.value)} />
             </SettingRow>
+            <SettingRow label="Tab Blur" desc="Background blur for inactive tabs (px, 0 = off)">
+              <input type="range" min="0" max="12" step="1"
+                value={settings.appearance.tabBlur}
+                onChange={e => update('appearance', 'tabBlur', +e.target.value)} />
+              <span style={{ fontSize: 11, color: 'var(--fg-muted)', minWidth: 20, textAlign: 'right' }}>
+                {settings.appearance.tabBlur}px
+              </span>
+            </SettingRow>
           </>
         )}
         {activeCat === 'terminal' && (
