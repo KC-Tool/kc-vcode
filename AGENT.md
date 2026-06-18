@@ -57,3 +57,17 @@
 - **P3-9** `StatusBar` 的 `0 Errors 0 Warnings` 是硬编码，没接 Monaco marker service
 - **P3-10** `mainWin` 还是 `let` 全局，没封装成 `getMainWindow()` / `setMainWindow()`
 - **snippets 错**：上游就有的 `customerr` / `useMediaQuery` / `retry` 等 snippet 嵌套引号 TS 解析错，**不在本次任务范围**（规则 30）
+
+## 后续修复
+
+### 状态恢复（commit d9e6503）
+- `EditorContext.tsx` 的 `loadSavedState`：恢复时**清空所有 tabs**，不再恢复上次的 tab 列表
+- 原因：恢复 tabs 但 content 是空的，用户看到空白 tab，体验很差
+
+### 终端异常（commit d9e6503）
+- `Terminal.tsx`：**每次 visible=true 时重新创建 xterm + pty**，visible=false 时销毁
+- 原来用 `createdRef` 锁死只创建一次，pty 重启后 xterm 还在监听旧的，导致数据丢失
+
+### snippet 解析错误（commits 96ccab6 / 82a6ee2）
+- esbuild 在 TS 严格模式下把 snippet 字符串里的 `${...}` Monaco 占位符当模板插值解析
+- 修法：简化/删除有问题的 snippet（strinter/clgt/useMediaQuery），修 customerr/retry 的引号嵌套
