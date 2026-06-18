@@ -111,7 +111,6 @@ function AppContent() {
         closeTab(state.activeTabId)
       }
     }
-  }, [state.activeTabId, state.tabs, closeTab, openSettings])
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown)

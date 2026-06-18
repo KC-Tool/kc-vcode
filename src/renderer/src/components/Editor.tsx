@@ -25,12 +25,15 @@ self.MonacoEnvironment = {
 
 export default function EditorPane() {
   const { state, updateContent, markSaved, setCursor } = useEditorContext()
+  const { settings } = useSettings()
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null)
   const monacoRef = useRef<any>(null)
   const [previewMode, setPreviewMode] = useState(false)
 
   const activeFile = state.activeTabId ? state.files[state.activeTabId] : null
   const isMarkdown = activeFile?.language === 'markdown'
+  const ed = settings.editor
+  const monacoTheme = settings.appearance.theme === 'dark' ? 'vs-dark' : 'vs'
 
   const handleSave = useCallback(async () => {
     if (!activeFile) return
@@ -40,6 +43,13 @@ export default function EditorPane() {
     })
     if ('success' in result && result.success) markSaved(activeFile.path)
   }, [activeFile, markSaved])
+
+  useEffect(() => {
+    if (!settings.files.autoSave || !activeFile) return
+    if (activeFile.content === activeFile.originalContent) return
+    const t = setTimeout(() => { handleSave() }, 1500)
+    return () => clearTimeout(t)
+  }, [activeFile?.content, activeFile?.originalContent, settings.files.autoSave, handleSave, activeFile])
 
   const handleEditorMount: OnMount = useCallback((editor, monaco) => {
     editorRef.current = editor
@@ -52,7 +62,7 @@ export default function EditorPane() {
     editor.addCommand(2048 | 49, () => handleSave())
 
     // register custom completions per language
-    for (const [lang, snippets] of Object.entries(snippetCompletions)) {
+    for (const [lang, snippets] of Object.entries(allSnippets)) {
       monaco.languages.registerCompletionItemProvider(lang, {
         provideCompletionItems: (model: any, position: any) => {
           const word = model.getWordUntilPosition(position)
@@ -159,13 +169,35 @@ export default function EditorPane() {
   useEffect(() => {
     const monaco = monacoRef.current
     if (!monaco) return
-    monaco.editor.setTheme(state.theme === 'dark' ? 'vs-dark' : 'vs')
-  }, [state.theme])
+    monaco.editor.setTheme(monacoTheme)
+  }, [monacoTheme])
 
   useEffect(() => {
     window.electronAPI.onRequestSave(() => handleSave())
     return () => { window.electronAPI.removeAllListeners('file:requestSave') }
   }, [handleSave])
+
+  useEffect(() => {
+    if (!settings.files.autoSave || !activeFile) return
+    if (activeFile.content === activeFile.originalContent) return
+    const t = setTimeout(() => { handleSave() }, 1500)
+    return () => clearTimeout(t)
+  }, [activeFile, settings.files.autoSave, handleSave])
+
+  const autoPath = activeFile?.path
+  const autoContent = activeFile?.content
+  const autoDirty = activeFile?.isDirty
+
+  useEffect(() => {
+    if (!settings.files.autoSave) return
+    if (!autoPath || !autoContent || !autoDirty) return
+    const id = setTimeout(() => {
+      window.electronAPI.saveFile({ path: autoPath, content: autoContent }).then(r => {
+        if ('success' in r && r.success) markSaved(autoPath)
+      })
+    }, 1500)
+    return () => clearTimeout(id)
+  }, [autoPath, autoContent, autoDirty, settings.files.autoSave, markSaved])
 
   // Go to Line
   useEffect(() => {
@@ -221,23 +253,23 @@ export default function EditorPane() {
             height="100%"
             language={activeFile.language}
             value={activeFile.content}
-            theme="vs-dark"
+            theme={monacoTheme}
             onChange={(v) => { if (v !== undefined) updateContent(activeFile.path, v) }}
             onMount={handleEditorMount}
             options={{
-              fontSize: 14,
-              fontFamily: "'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace",
+              fontSize: ed.fontSize,
+              fontFamily: ed.fontFamily,
               fontLigatures: true,
-              minimap: { enabled: true },
-              lineNumbers: 'on',
+              minimap: { enabled: ed.minimap },
+              lineNumbers: ed.lineNumbers ? 'on' : 'off',
               renderWhitespace: 'selection',
-              tabSize: 2,
+              tabSize: ed.tabSize,
               insertSpaces: true,
-              wordWrap: 'off',
+              wordWrap: ed.wordWrap,
               scrollBeyondLastLine: false,
               automaticLayout: true,
-              smoothScrolling: true,
-              cursorBlinking: 'smooth',
+              smoothScrolling: ed.smoothScrolling,
+              cursorBlinking: ed.cursorBlinking,
               cursorSmoothCaretAnimation: 'on',
               bracketPairColorization: { enabled: true },
               autoClosingBrackets: 'always',
