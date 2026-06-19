@@ -24,7 +24,7 @@ self.MonacoEnvironment = {
 }
 
 export default function EditorPane() {
-  const { state, updateContent, markSaved, setCursor } = useEditorContext()
+  const { state, updateContent, markSaved, setCursor, setMarkers } = useEditorContext()
   const { settings } = useSettings()
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null)
   const monacoRef = useRef<any>(null)
@@ -57,6 +57,18 @@ export default function EditorPane() {
 
     editor.onDidChangeCursorPosition((e) => {
       if (activeFile) setCursor(activeFile.path, e.position.lineNumber, e.position.column)
+    })
+
+    monaco.editor.onDidChangeModelMarkers((e) => {
+      const allMarkers = monaco.editor.getModelMarkers({})
+      const mapped = allMarkers.map(m => ({
+        file: m.resource?.path || m.source || '',
+        line: m.startLineNumber,
+        column: m.startColumn,
+        message: m.message,
+        severity: m.severity === 8 ? 'error' as const : m.severity === 4 ? 'warning' as const : m.severity === 2 ? 'info' as const : 'hint' as const
+      }))
+      setMarkers(mapped)
     })
 
     editor.addCommand(2048 | 49, () => handleSave())
