@@ -59,7 +59,7 @@ export default function EditorPane() {
       if (activeFile) setCursor(activeFile.path, e.position.lineNumber, e.position.column)
     })
 
-    monaco.editor.onDidChangeModelMarkers((e) => {
+    monaco.editor.onDidChangeMarkers((e) => {
       const allMarkers = monaco.editor.getModelMarkers({})
       const mapped = allMarkers.map(m => ({
         file: m.resource?.path || m.source || '',
