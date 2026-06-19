@@ -39,7 +39,7 @@ function getLanguage(filePath: string): string {
 }
 
 async function readDirRecursive(dirPath: string, depth = 0): Promise<FileNode[]> {
-  if (depth > 8) return []
+  if (depth > 2) return []
   const result: FileNode[] = []
 
   try {
