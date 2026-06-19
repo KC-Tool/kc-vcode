@@ -2,6 +2,7 @@ import React, { useCallback, useState, useRef, useEffect } from 'react'
 import FileTree from './FileTree'
 import SearchPanel from './SearchPanel'
 import SourceControl from './SourceControl'
+import ProblemsPanel from './ProblemsPanel'
 import ActivityBar, { ActivityView } from './ActivityBar'
 import { FileNode } from '../../../preload/index'
 import { useEditorContext } from '../contexts/EditorContext'
@@ -118,6 +119,9 @@ export default function Sidebar({ tree, onOpenFolder, onRefresh, onOpenSettings,
         )}
         {view === 'source-control' && (
           <SourceControl dirPath={dirPath} onRefresh={onRefresh} />
+        )}
+        {view === 'problems' && (
+          <ProblemsPanel />
         )}
       </div>
     </div>

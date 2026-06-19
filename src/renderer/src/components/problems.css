@@ -1,0 +1,116 @@
+/* problems panel */
+.pm-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.pm-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.pm-summary-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+}
+
+.pm-error { color: var(--fg-danger); }
+.pm-warn { color: var(--fg-warn); }
+
+.pm-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.pm-file-group {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.pm-file-group:last-child {
+  border-bottom: none;
+}
+
+.pm-file-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px;
+  font-size: 11px;
+  color: var(--fg-secondary);
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.pm-file-name {
+  font-weight: 600;
+  color: var(--fg-primary);
+}
+
+.pm-file-path {
+  font-size: 10px;
+  color: var(--fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-left: 8px;
+}
+
+.pm-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.pm-item:hover {
+  background: var(--bg-hover);
+}
+
+.pm-icon {
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+  font-size: 11px;
+}
+
+.pm-error .pm-icon { color: var(--fg-danger); }
+.pm-warn .pm-icon { color: var(--fg-warn); }
+.pm-info .pm-icon { color: var(--fg-accent); }
+.pm-hint .pm-icon { color: var(--fg-muted); }
+
+.pm-msg {
+  flex: 1;
+  color: var(--fg-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pm-pos {
+  font-size: 11px;
+  color: var(--fg-muted);
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+}
+
+.pm-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--fg-muted);
+  font-size: 12px;
+}
