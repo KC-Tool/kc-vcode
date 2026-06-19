@@ -17,6 +17,14 @@ export interface FileData {
   cursorColumn?: number
 }
 
+export interface MarkerData {
+  file: string
+  line: number
+  column: number
+  message: string
+  severity: 'error' | 'warning' | 'info' | 'hint'
+}
+
 interface EditorState {
   tabs: Tab[]
   activeTabId: string | null
@@ -24,6 +32,7 @@ interface EditorState {
   directoryPath: string | null
   directoryName: string | null
   theme: 'dark' | 'light'
+  markers: MarkerData[]
 }
 
 type Action =
@@ -37,6 +46,7 @@ type Action =
   | { type: 'SET_CURSOR'; payload: { path: string; line: number; column: number } }
   | { type: 'SET_THEME'; payload: { theme: 'dark' | 'light' } }
   | { type: 'OPEN_SETTINGS' }
+  | { type: 'SET_MARKERS'; payload: MarkerData[] }
   | { type: 'RESTORE'; payload: EditorState }
 
 const MAX_TABS = 20
@@ -188,6 +198,9 @@ function editorReducer(state: EditorState, action: Action): EditorState {
       break
     }
 
+    case 'SET_MARKERS':
+      return { ...state, markers: action.payload }
+
     default:
       return state
   }
@@ -202,7 +215,8 @@ const initialState: EditorState = saved || {
   files: {},
   directoryPath: null,
   directoryName: null,
-  theme: 'dark'
+  theme: 'dark',
+  markers: []
 }
 
 interface EditorContextType {
@@ -217,6 +231,7 @@ interface EditorContextType {
   setCursor: (path: string, line: number, column: number) => void
   setTheme: (theme: 'dark' | 'light') => void
   openSettings: () => void
+  setMarkers: (markers: MarkerData[]) => void
 }
 
 const EditorContext = createContext<EditorContextType | null>(null)
@@ -267,10 +282,14 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: 'OPEN_SETTINGS' })
   }, [])
 
+  const setMarkers = useCallback((markers: MarkerData[]) => {
+    dispatch({ type: 'SET_MARKERS', payload: markers })
+  }, [])
+
   return (
     <EditorContext.Provider value={{
       state, openFile, closeTab, setActiveTab,
-      updateContent, markSaved, setDirectory, closeAllTabs, setCursor, setTheme, openSettings
+      updateContent, markSaved, setDirectory, closeAllTabs, setCursor, setTheme, openSettings, setMarkers
     }}>
       {children}
     </EditorContext.Provider>
