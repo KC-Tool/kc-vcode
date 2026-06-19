@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, Menu, shell, clipboard } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -510,6 +510,47 @@ function registerIpcHandlers(): void {
       if (fs.existsSync(fp)) return { error: 'Folder already exists' }
       fs.mkdirSync(fp, { recursive: true })
       return { success: true, path: fp, name: data.name }
+    } catch (err: unknown) {
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  ipcMain.handle('file:delete', (_, filePath: string) => {
+    try {
+      fs.unlinkSync(filePath)
+      return { success: true }
+    } catch (err: unknown) {
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  ipcMain.handle('file:rename', (_, data: { filePath: string; newName: string }) => {
+    try {
+      const dir = path.dirname(data.filePath)
+      const newPath = path.join(dir, data.newName)
+      if (fs.existsSync(newPath)) return { error: 'Target already exists' }
+      fs.renameSync(data.filePath, newPath)
+      return { success: true, path: newPath }
+    } catch (err: unknown) {
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  ipcMain.handle('file:copyPath', (_, filePath: string) => {
+    clipboard.writeText(filePath)
+    return { success: true }
+  })
+
+  ipcMain.handle('file:copyRelativePath', (_, data: { filePath: string; cwd: string }) => {
+    const rel = path.relative(data.cwd, data.filePath)
+    clipboard.writeText(rel)
+    return { success: true }
+  })
+
+  ipcMain.handle('file:revealInExplorer', (_, filePath: string) => {
+    try {
+      shell.showItemInFolder(filePath)
+      return { success: true }
     } catch (err: unknown) {
       return { error: err instanceof Error ? err.message : String(err) }
     }
