@@ -13,13 +13,12 @@ function debounce(cb: () => void, ms: number): ReturnType<typeof setTimeout> {
   return setTimeout(cb, ms)
 }
 
-function startWatch(dirPath: string, win: BrowserWindow, depth = 0): fs.FSWatcher[] {
-  if (depth > 3) return [] // don't go too deep
+function startWatch(dirPath: string, win: BrowserWindow): fs.FSWatcher[] {
   const ignore = new Set(['node_modules', '.git', '.svn', 'out', 'dist', 'target'])
   const result: fs.FSWatcher[] = []
 
   try {
-    const watcher = fs.watch(dirPath, () => {
+    const watcher = fs.watch(dirPath, { recursive: true }, () => {
       const existing = watchers.get(dirPath)
       if (existing?.timer) clearTimeout(existing.timer)
       if (existing) {
@@ -31,15 +30,6 @@ function startWatch(dirPath: string, win: BrowserWindow, depth = 0): fs.FSWatche
       }
     })
     result.push(watcher)
-
-    const entries = fs.readdirSync(dirPath, { withFileTypes: true })
-    for (const entry of entries) {
-      if (ignore.has(entry.name) || entry.name.startsWith('.')) continue
-      if (entry.isDirectory()) {
-        const sub = path.join(dirPath, entry.name)
-        result.push(...startWatch(sub, win, depth + 1))
-      }
-    }
   } catch {
     // permission denied, skip
   }

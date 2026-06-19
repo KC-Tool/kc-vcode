@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useContext, useEffect, useRef } from 'react'
+import React, { useState, useCallback, useEffect, useRef, memo } from 'react'
 import { FileNode } from '../../../preload/index'
 import { IconForFile, IconForFolder } from '../utils/fileIcons'
 import { useEditorContext } from '../contexts/EditorContext'
@@ -17,15 +17,24 @@ interface ContextMenuState {
   node: FileNode
 }
 
-function FileTreeItem({ node, onFileClick, depth = 0, directoryPath, onRefresh }: {
+const FileTreeItem = memo(function FileTreeItem({ node, onFileClick, depth = 0, directoryPath, onRefresh, renamingPath, onStartRename }: {
   node: FileNode; onFileClick: (node: FileNode) => void; depth: number
   directoryPath?: string | null; onRefresh?: () => void
+  renamingPath: string | null; onStartRename: (path: string) => void
 }) {
   const [expanded, setExpanded] = useState(false)
-  const [renaming, setRenaming] = useState(false)
   const [newName, setNewName] = useState(node.name)
+  const inputRef = useRef<HTMLInputElement>(null)
   const { openFile } = useEditorContext()
   const isDir = node.type === 'directory'
+  const isRenaming = node.path === renamingPath
+
+  useEffect(() => {
+    if (isRenaming) {
+      setNewName(node.name)
+      inputRef.current?.focus()
+    }
+  }, [isRenaming, node.name])
 
   const handleClick = useCallback(() => {
     if (isDir) setExpanded(!expanded)
@@ -40,17 +49,6 @@ function FileTreeItem({ node, onFileClick, depth = 0, directoryPath, onRefresh }
     }))
   }, [node])
 
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const ce = e as CustomEvent<{ filePath: string }>
-      if (ce.detail.filePath === node.path) {
-        setRenaming(true)
-      }
-    }
-    window.addEventListener('file-tree-rename', handler)
-    return () => window.removeEventListener('file-tree-rename', handler)
-  }, [node.path])
-
   const handleRenameKeyDown = useCallback(async (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       const trimmed = newName.trim()
@@ -58,11 +56,11 @@ function FileTreeItem({ node, onFileClick, depth = 0, directoryPath, onRefresh }
         await window.electronAPI.renameFile({ filePath: node.path, newName: trimmed })
         onRefresh?.()
       }
-      setRenaming(false)
+      onStartRename('')
     } else if (e.key === 'Escape') {
-      setRenaming(false)
+      onStartRename('')
     }
-  }, [newName, node, onRefresh])
+  }, [newName, node, onRefresh, onStartRename])
 
   return (
     <div>
@@ -79,12 +77,12 @@ function FileTreeItem({ node, onFileClick, depth = 0, directoryPath, onRefresh }
           <span className="file-tree-icon"><IconForFile name={node.name} /></span>
         )}
         <span className="file-tree-name">
-          {renaming ? (
+          {isRenaming ? (
             <input
-              autoFocus
+              ref={inputRef}
               value={newName}
               onChange={e => setNewName(e.target.value)}
-              onBlur={() => setRenaming(false)}
+              onBlur={() => onStartRename('')}
               onKeyDown={handleRenameKeyDown}
               onClick={e => e.stopPropagation()}
             />
@@ -100,16 +98,19 @@ function FileTreeItem({ node, onFileClick, depth = 0, directoryPath, onRefresh }
               depth={depth + 1}
               directoryPath={directoryPath}
               onRefresh={onRefresh}
+              renamingPath={renamingPath}
+              onStartRename={onStartRename}
             />
           )}
         </div>
       )}
     </div>
   )
-}
+})
 
 export default function FileTree({ tree, onFileClick, depth = 0, directoryPath, onRefresh }: FileTreeProps) {
   const [menu, setMenu] = useState<ContextMenuState | null>(null)
+  const [renamingPath, setRenamingPath] = useState<string | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -132,37 +133,35 @@ export default function FileTree({ tree, onFileClick, depth = 0, directoryPath, 
   }, [menu])
 
   const execute = useCallback(async (action: string, node: FileNode) => {
-    const api = window.electronAPI
     switch (action) {
       case 'open':
         onFileClick(node)
         break
-      case 'open-browser':
-        const res = await api.openFile(node.path)
-        if ('content' in res) {
-          openFile(node.path, node.name, res.content, res.language)
-        }
+      case 'open-browser': {
+        const res = await window.electronAPI.openFile(node.path)
+        if ('content' in res) openFile(node.path, node.name, res.content, res.language)
         break
+      }
       case 'reveal':
-        api.revealInExplorer(node.path)
+        window.electronAPI.revealInExplorer(node.path)
         break
       case 'terminal':
-        api.createTerminal(node.path)
+        window.electronAPI.createTerminal(node.path)
         break
       case 'copy':
         navigator.clipboard.writeText(node.path)
         break
       case 'copy-path':
-        api.copyFilePath(node.path)
+        window.electronAPI.copyFilePath(node.path)
         break
       case 'copy-relative':
-        if (directoryPath) api.copyFileRelativePath({ filePath: node.path, cwd: directoryPath })
+        if (directoryPath) window.electronAPI.copyFileRelativePath({ filePath: node.path, cwd: directoryPath })
         break
       case 'rename':
-        window.dispatchEvent(new CustomEvent('file-tree-rename', { detail: node.path }))
+        setRenamingPath(node.path)
         break
       case 'delete':
-        await api.deleteFile(node.path)
+        await window.electronAPI.deleteFile(node.path)
         onRefresh?.()
         break
     }
@@ -179,6 +178,8 @@ export default function FileTree({ tree, onFileClick, depth = 0, directoryPath, 
           onFileClick={onFileClick}
           directoryPath={directoryPath}
           onRefresh={onRefresh}
+          renamingPath={renamingPath}
+          onStartRename={setRenamingPath}
         />
       ))}
       {menu && (
