@@ -39,33 +39,25 @@ function getLanguage(filePath: string): string {
 }
 
 async function readDirRecursive(dirPath: string, depth = 0): Promise<FileNode[]> {
-  if (depth > 2) return []
+  if (depth > 0) return []
   const result: FileNode[] = []
+  const ignore = new Set(['node_modules', '.git', '.svn', 'out', 'dist', 'target'])
 
   try {
     const entries = await fs.promises.readdir(dirPath, { withFileTypes: true })
-    const ignore = new Set(['node_modules', '.git', '.svn', 'out', 'dist', 'target'])
-
     for (const entry of entries) {
       if (ignore.has(entry.name)) continue
       if (entry.name.startsWith('.')) continue
-
       const fullPath = path.join(dirPath, entry.name)
       if (entry.isDirectory()) {
-        const children = await readDirRecursive(fullPath, depth + 1)
-        result.push({ name: entry.name, path: fullPath, type: 'directory', children })
-      } else {
-        result.push({ name: entry.name, path: fullPath, type: 'file', language: getLanguage(fullPath) })
+        result.push({ name: entry.name, path: fullPath, type: 'directory', children: [] })
       }
     }
   } catch {
     // permission denied
   }
 
-  result.sort((a, b) => {
-    if (a.type !== b.type) return a.type === 'directory' ? -1 : 1
-    return a.name.localeCompare(b.name)
-  })
+  result.sort((a, b) => a.name.localeCompare(b.name))
   return result
 }
 

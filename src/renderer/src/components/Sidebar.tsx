@@ -14,9 +14,10 @@ interface SidebarProps {
   onRefresh: () => void
   onOpenSettings: () => void
   dirPath: string | null
+  onLoadChildren?: (parentPath: string) => Promise<void>
 }
 
-export default function Sidebar({ tree, onOpenFolder, onRefresh, onOpenSettings, dirPath }: SidebarProps) {
+export default function Sidebar({ tree, onOpenFolder, onRefresh, onOpenSettings, dirPath, onLoadChildren }: SidebarProps) {
   const { state, openFile } = useEditorContext()
   const [view, setView] = useState<ActivityView>('explorer')
   const [menuOpen, setMenuOpen] = useState(false)
@@ -106,7 +107,7 @@ export default function Sidebar({ tree, onOpenFolder, onRefresh, onOpenSettings,
               </div>
             ) : (
               <div className="sidebar-tree-wrap">
-                <FileTree tree={tree} onFileClick={handleFileClick} />
+                <FileTree tree={tree} onFileClick={handleFileClick} directoryPath={dirPath} onRefresh={onRefresh} />
               </div>
             )}
           </>

@@ -9,6 +9,7 @@ interface FileTreeProps {
   depth?: number
   directoryPath?: string | null
   onRefresh?: () => void
+  onLoadChildren?: (parentPath: string) => Promise<void>
 }
 
 interface ContextMenuState {
@@ -17,10 +18,13 @@ interface ContextMenuState {
   node: FileNode
 }
 
-const FileTreeItem = memo(function FileTreeItem({ node, onFileClick, depth = 0, directoryPath, onRefresh, renamingPath, onStartRename }: {
+const MAX_FILES = 200
+
+const FileTreeItem = memo(function FileTreeItem({ node, onFileClick, depth = 0, directoryPath, onRefresh, renamingPath, onStartRename, onLoadChildren }: {
   node: FileNode; onFileClick: (node: FileNode) => void; depth: number
   directoryPath?: string | null; onRefresh?: () => void
   renamingPath: string | null; onStartRename: (path: string) => void
+  onLoadChildren?: (parentPath: string) => Promise<void>
 }) {
   const [expanded, setExpanded] = useState(false)
   const [newName, setNewName] = useState(node.name)
@@ -37,9 +41,16 @@ const FileTreeItem = memo(function FileTreeItem({ node, onFileClick, depth = 0, 
   }, [isRenaming, node.name])
 
   const handleClick = useCallback(() => {
-    if (isDir) setExpanded(!expanded)
-    else onFileClick(node)
-  }, [isDir, expanded, node, onFileClick])
+    if (isDir) {
+      if (!expanded && node.children && node.children.length === 0 && onLoadChildren) {
+        onLoadChildren(node.path).then(() => setExpanded(true))
+        return
+      }
+      setExpanded(!expanded)
+    } else {
+      onFileClick(node)
+    }
+  }, [isDir, expanded, node, onFileClick, onLoadChildren])
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
@@ -91,24 +102,26 @@ const FileTreeItem = memo(function FileTreeItem({ node, onFileClick, depth = 0, 
       </div>
       {isDir && (
         <div className={`file-tree-children${expanded ? ' file-tree-children--open' : ''}`}>
-          {node.children && (
+          {node.children && node.children.map(child => (
             <FileTreeItem
-              node={node}
-              onFileClick={onFileClick}
+              key={child.path}
+              node={child}
               depth={depth + 1}
+              onFileClick={onFileClick}
               directoryPath={directoryPath}
               onRefresh={onRefresh}
               renamingPath={renamingPath}
               onStartRename={onStartRename}
+              onLoadChildren={onLoadChildren}
             />
-          )}
+          ))}
         </div>
       )}
     </div>
   )
 })
 
-export default function FileTree({ tree, onFileClick, depth = 0, directoryPath, onRefresh }: FileTreeProps) {
+export default function FileTree({ tree, onFileClick, depth = 0, directoryPath, onRefresh, onLoadChildren }: FileTreeProps) {
   const [menu, setMenu] = useState<ContextMenuState | null>(null)
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -180,6 +193,7 @@ export default function FileTree({ tree, onFileClick, depth = 0, directoryPath, 
           onRefresh={onRefresh}
           renamingPath={renamingPath}
           onStartRename={setRenamingPath}
+          onLoadChildren={onLoadChildren}
         />
       ))}
       {menu && (
