@@ -38,12 +38,12 @@ function getLanguage(filePath: string): string {
   return map[ext] || 'plaintext'
 }
 
-function readDirRecursive(dirPath: string, depth = 0): FileNode[] {
+async function readDirRecursive(dirPath: string, depth = 0): Promise<FileNode[]> {
   if (depth > 8) return []
   const result: FileNode[] = []
 
   try {
-    const entries = fs.readdirSync(dirPath, { withFileTypes: true })
+    const entries = await fs.promises.readdir(dirPath, { withFileTypes: true })
     const ignore = new Set(['node_modules', '.git', '.svn', 'out', 'dist', 'target'])
 
     for (const entry of entries) {
@@ -52,7 +52,7 @@ function readDirRecursive(dirPath: string, depth = 0): FileNode[] {
 
       const fullPath = path.join(dirPath, entry.name)
       if (entry.isDirectory()) {
-        const children = readDirRecursive(fullPath, depth + 1)
+        const children = await readDirRecursive(fullPath, depth + 1)
         result.push({ name: entry.name, path: fullPath, type: 'directory', children })
       } else {
         result.push({ name: entry.name, path: fullPath, type: 'file', language: getLanguage(fullPath) })
@@ -69,9 +69,9 @@ function readDirRecursive(dirPath: string, depth = 0): FileNode[] {
   return result
 }
 
-function openFolder(dirPath: string): void {
+async function openFolder(dirPath: string): Promise<void> {
   currentDir = dirPath
-  const tree = readDirRecursive(dirPath)
+  const tree = await readDirRecursive(dirPath)
   const rootName = path.basename(dirPath)
   mainWin?.webContents.send('directory:opened', { rootName, rootPath: dirPath, tree })
   if (mainWin) startWatching(dirPath, mainWin)
@@ -394,7 +394,7 @@ function registerIpcHandlers(): void {
     const result = await dialog.showOpenDialog(mainWin, { properties: ['openDirectory'] })
     if (result.canceled || !result.filePaths[0]) return null
     const dirPath = result.filePaths[0]
-    const tree = readDirRecursive(dirPath)
+    const tree = await readDirRecursive(dirPath)
     if (currentDir) stopWatching(currentDir)
     currentDir = dirPath
     startWatching(dirPath, mainWin)
@@ -442,15 +442,15 @@ function registerIpcHandlers(): void {
         currentDir = dirPath
         if (mainWin) startWatching(dirPath, mainWin)
       }
-      return { tree: readDirRecursive(dirPath) }
+      return { tree: await readDirRecursive(dirPath) }
     } catch (err: unknown) {
       return { error: err instanceof Error ? err.message : String(err) }
     }
   })
 
-  ipcMain.handle('file:refreshDir', (_, dirPath: string) => {
+  ipcMain.handle('file:refreshDir', async (_, dirPath: string) => {
     try {
-      return { tree: readDirRecursive(dirPath) }
+      return { tree: await readDirRecursive(dirPath) }
     } catch (err: unknown) {
       return { error: err instanceof Error ? err.message : String(err) }
     }
