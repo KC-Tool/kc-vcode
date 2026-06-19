@@ -51,6 +51,8 @@ async function readDirRecursive(dirPath: string, depth = 0): Promise<FileNode[]>
       const fullPath = path.join(dirPath, entry.name)
       if (entry.isDirectory()) {
         result.push({ name: entry.name, path: fullPath, type: 'directory', children: [] })
+      } else {
+        result.push({ name: entry.name, path: fullPath, type: 'file', language: getLanguage(fullPath) })
       }
     }
   } catch {
