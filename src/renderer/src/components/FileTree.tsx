@@ -85,7 +85,11 @@ function FileTreeItem({ node, onFileClick, directoryPath, depth = 0, onContextMe
         title={node.path}
       >
         {isDir ? (
-          <span className={`file-tree-arrow${expanded ? ' file-tree-arrow--expanded' : ''}`}>&#9654;</span>
+          <span className={`file-tree-arrow${expanded ? ' file-tree-arrow--expanded' : ''}`}>
+            <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+              <path d="M2.5 1.5L5.5 4L2.5 6.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
         ) : (
           <span className="file-tree-icon"><IconForFile name={node.name} /></span>
         )}

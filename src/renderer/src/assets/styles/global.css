@@ -547,8 +547,6 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 9px;
-  color: var(--fg-muted);
   flex-shrink: 0;
   transition: transform var(--duration-normal) var(--ease-spring);
 }
@@ -575,7 +573,7 @@ body {
 .file-tree-children {
   display: grid;
   grid-template-rows: 0fr;
-  transition: grid-template-rows 200ms var(--ease-out);
+  transition: grid-template-rows 250ms var(--ease-out);
 }
 
 .file-tree-children--open {
@@ -585,6 +583,15 @@ body {
 .file-tree-children > * {
   min-height: 0;
   overflow: hidden;
+}
+
+.file-tree-children--open > * {
+  animation: tree-item-fade-in 200ms var(--ease-out);
+}
+
+@keyframes tree-item-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* ── status bar ── */
