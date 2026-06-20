@@ -1,8 +1,9 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useRef, useEffect } from 'react'
 import { FileNode } from '../../../preload/index'
 import { IconForFile, IconForFolder } from '../utils/fileIcons'
 import ContextMenu, { ContextMenuItem } from './ContextMenu'
 import { useEditorContext } from '../contexts/EditorContext'
+import { useConfirm } from '../contexts/ConfirmContext'
 
 interface FileTreeProps {
   tree: FileNode[]
@@ -17,12 +18,48 @@ interface MenuState {
   node: FileNode
 }
 
-function FileTreeItem({ node, onFileClick, directoryPath, depth = 0, onContextMenu }: {
+function RenameInput({ name, onConfirm, onCancel }: { name: string; onConfirm: (v: string) => void; onCancel: () => void }) {
+  const [value, setValue] = useState(name)
+  const ref = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    ref.current?.focus()
+    ref.current?.select()
+  }, [])
+
+  const commit = useCallback(() => {
+    const trimmed = value.trim()
+    if (trimmed && trimmed !== name) onConfirm(trimmed)
+    else onCancel()
+  }, [value, name, onConfirm, onCancel])
+
+  return (
+    <input
+      ref={ref}
+      className="sidebar-input"
+      value={value}
+      onChange={e => setValue(e.target.value)}
+      onBlur={commit}
+      onKeyDown={e => {
+        if (e.key === 'Enter') commit()
+        if (e.key === 'Escape') onCancel()
+      }}
+      onClick={e => e.stopPropagation()}
+      onContextMenu={e => e.stopPropagation()}
+      style={{ marginLeft: 0, height: 18, fontSize: 12 }}
+    />
+  )
+}
+
+function FileTreeItem({ node, onFileClick, directoryPath, depth = 0, onContextMenu, renaming, onRenameConfirm, onRenameCancel }: {
   node: FileNode
   onFileClick: (node: FileNode) => void
   directoryPath?: string | null
   depth: number
   onContextMenu: (e: React.MouseEvent, node: FileNode) => void
+  renaming: boolean
+  onRenameConfirm: (newName: string) => void
+  onRenameCancel: () => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const isDir = node.type === 'directory'
@@ -52,12 +89,16 @@ function FileTreeItem({ node, onFileClick, directoryPath, depth = 0, onContextMe
         ) : (
           <span className="file-tree-icon"><IconForFile name={node.name} /></span>
         )}
-        <span className="file-tree-name">{node.name}</span>
+        {renaming ? (
+          <RenameInput name={node.name} onConfirm={onRenameConfirm} onCancel={onRenameCancel} />
+        ) : (
+          <span className="file-tree-name">{node.name}</span>
+        )}
       </div>
       {isDir && (
         <div className={`file-tree-children${expanded ? ' file-tree-children--open' : ''}`}>
           {node.children && (
-            <FileTreeItems nodes={node.children} onFileClick={onFileClick} directoryPath={directoryPath} depth={depth + 1} onContextMenu={onContextMenu} />
+            <FileTreeItems nodes={node.children} onFileClick={onFileClick} directoryPath={directoryPath} depth={depth + 1} onContextMenu={onContextMenu} renamingPath={null} onRenameConfirm={onRenameConfirm} onRenameCancel={onRenameCancel} />
           )}
         </div>
       )}
@@ -65,12 +106,15 @@ function FileTreeItem({ node, onFileClick, directoryPath, depth = 0, onContextMe
   )
 }
 
-function FileTreeItems({ nodes, onFileClick, directoryPath, depth, onContextMenu }: {
+function FileTreeItems({ nodes, onFileClick, directoryPath, depth, onContextMenu, renamingPath, onRenameConfirm, onRenameCancel }: {
   nodes: FileNode[]
   onFileClick: (node: FileNode) => void
   directoryPath?: string | null
   depth: number
   onContextMenu: (e: React.MouseEvent, node: FileNode) => void
+  renamingPath: string | null
+  onRenameConfirm: (newName: string) => void
+  onRenameCancel: () => void
 }) {
   return (
     <div>
@@ -82,6 +126,9 @@ function FileTreeItems({ nodes, onFileClick, directoryPath, depth, onContextMenu
           directoryPath={directoryPath}
           depth={depth}
           onContextMenu={onContextMenu}
+          renaming={renamingPath === node.path}
+          onRenameConfirm={onRenameConfirm}
+          onRenameCancel={onRenameCancel}
         />
       ))}
     </div>
@@ -90,7 +137,9 @@ function FileTreeItems({ nodes, onFileClick, directoryPath, depth, onContextMenu
 
 export default function FileTree({ tree, onFileClick, directoryPath, depth = 0 }: FileTreeProps) {
   const [menu, setMenu] = useState<MenuState | null>(null)
-  const { openFile, state, directoryPath: ctxDirPath } = useEditorContext()
+  const [renamingPath, setRenamingPath] = useState<string | null>(null)
+  const { directoryPath: ctxDirPath } = useEditorContext()
+  const { confirm } = useConfirm()
 
   const dirPath = directoryPath ?? ctxDirPath
 
@@ -98,6 +147,19 @@ export default function FileTree({ tree, onFileClick, directoryPath, depth = 0 }
 
   const handleContextMenu = useCallback((e: React.MouseEvent, node: FileNode) => {
     setMenu({ x: e.clientX, y: e.clientY, node })
+  }, [])
+
+  const handleRenameConfirm = useCallback(async (newName: string) => {
+    if (!renamingPath) return
+    const result = await window.electronAPI.renameFile(renamingPath, newName)
+    if ('error' in result && result.error) {
+      await confirm({ title: 'Rename failed', message: result.error, okText: 'OK' })
+    }
+    setRenamingPath(null)
+  }, [renamingPath, confirm])
+
+  const handleRenameCancel = useCallback(() => {
+    setRenamingPath(null)
   }, [])
 
   const buildMenuItems = useCallback((): ContextMenuItem[] => {
@@ -108,7 +170,6 @@ export default function FileTree({ tree, onFileClick, directoryPath, depth = 0 }
     const relativePath = dirPath ? node.path.replace(dirPath, '').replace(/^[/\\]/, '') : node.name
 
     return [
-      // Open
       isFile && {
         label: 'Open to the Side',
         shortcut: 'Ctrl+\\',
@@ -125,7 +186,6 @@ export default function FileTree({ tree, onFileClick, directoryPath, depth = 0 }
       },
       isFile && { label: 'Open With...', disabled: true },
       { divider: true },
-      // Reveal & Terminal
       {
         label: 'Reveal in File Explorer',
         shortcut: 'Shift+Alt+R',
@@ -138,10 +198,8 @@ export default function FileTree({ tree, onFileClick, directoryPath, depth = 0 }
         }
       },
       { divider: true },
-      // Compare
       isFile && { label: 'Select for Compare', disabled: true },
       { divider: true },
-      // Clipboard
       {
         label: 'Cut',
         shortcut: 'Ctrl+X',
@@ -163,41 +221,38 @@ export default function FileTree({ tree, onFileClick, directoryPath, depth = 0 }
         action: () => window.electronAPI.clipboardWriteText(relativePath)
       },
       { divider: true },
-      // Rename & Delete
       {
         label: 'Rename...',
         shortcut: 'F2',
         action: () => {
-          const newName = window.prompt('Rename to:', node.name)
-          if (newName && newName !== node.name) {
-            window.electronAPI.renameFile(node.path, newName).then(result => {
-              if ('error' in result && result.error) {
-                window.alert(result.error)
-              }
-            })
-          }
+          setRenamingPath(node.path)
         }
       },
       {
         label: 'Delete',
         shortcut: 'Delete',
         danger: true,
-        action: () => {
-          if (window.confirm(`Are you sure you want to delete '${node.name}'?`)) {
-            window.electronAPI.deleteFile(node.path).then(result => {
-              if ('error' in result && result.error) {
-                window.alert(result.error)
-              }
-            })
+        action: async () => {
+          const ok = await confirm({
+            title: 'Delete',
+            message: `Are you sure you want to delete '${node.name}'?`,
+            okText: 'Delete',
+            danger: true
+          })
+          if (ok) {
+            const result = await window.electronAPI.deleteFile(node.path)
+            if ('error' in result && result.error) {
+              await confirm({ title: 'Delete failed', message: result.error, okText: 'OK' })
+            }
           }
         }
       }
     ].filter(Boolean) as ContextMenuItem[]
-  }, [menu, dirPath, onFileClick])
+  }, [menu, dirPath, onFileClick, confirm])
 
   return (
     <div className="file-tree">
-      <FileTreeItems nodes={tree} onFileClick={onFileClick} directoryPath={dirPath} depth={depth} onContextMenu={handleContextMenu} />
+      <FileTreeItems nodes={tree} onFileClick={onFileClick} directoryPath={dirPath} depth={depth} onContextMenu={handleContextMenu} renamingPath={renamingPath} onRenameConfirm={handleRenameConfirm} onRenameCancel={handleRenameCancel} />
       {menu && (
         <ContextMenu
           x={menu.x}
