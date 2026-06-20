@@ -1,77 +1,42 @@
-import React, { useState, useCallback, useEffect, useRef, memo } from 'react'
+import React, { useState, useCallback } from 'react'
 import { FileNode } from '../../../preload/index'
 import { IconForFile, IconForFolder } from '../utils/fileIcons'
+import ContextMenu, { ContextMenuItem } from './ContextMenu'
 import { useEditorContext } from '../contexts/EditorContext'
 
 interface FileTreeProps {
   tree: FileNode[]
   onFileClick: (node: FileNode) => void
-  depth?: number
   directoryPath?: string | null
-  onRefresh?: () => void
-  onLoadChildren?: (parentPath: string) => Promise<void>
+  depth?: number
 }
 
-interface ContextMenuState {
+interface MenuState {
   x: number
   y: number
   node: FileNode
 }
 
-const MAX_FILES = 200
-
-const FileTreeItem = memo(function FileTreeItem({ node, onFileClick, depth = 0, directoryPath, onRefresh, renamingPath, onStartRename, onLoadChildren }: {
-  node: FileNode; onFileClick: (node: FileNode) => void; depth: number
-  directoryPath?: string | null; onRefresh?: () => void
-  renamingPath: string | null; onStartRename: (path: string) => void
-  onLoadChildren?: (parentPath: string) => Promise<void>
+function FileTreeItem({ node, onFileClick, directoryPath, depth = 0, onContextMenu }: {
+  node: FileNode
+  onFileClick: (node: FileNode) => void
+  directoryPath?: string | null
+  depth: number
+  onContextMenu: (e: React.MouseEvent, node: FileNode) => void
 }) {
   const [expanded, setExpanded] = useState(false)
-  const [newName, setNewName] = useState(node.name)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const { openFile } = useEditorContext()
   const isDir = node.type === 'directory'
-  const isRenaming = node.path === renamingPath
-
-  useEffect(() => {
-    if (isRenaming) {
-      setNewName(node.name)
-      inputRef.current?.focus()
-    }
-  }, [isRenaming, node.name])
 
   const handleClick = useCallback(() => {
-    if (isDir) {
-      if (!expanded && node.children && node.children.length === 0 && onLoadChildren) {
-        onLoadChildren(node.path).then(() => setExpanded(true))
-        return
-      }
-      setExpanded(!expanded)
-    } else {
-      onFileClick(node)
-    }
-  }, [isDir, expanded, node, onFileClick, onLoadChildren])
+    if (isDir) setExpanded(!expanded)
+    else onFileClick(node)
+  }, [isDir, expanded, node, onFileClick])
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    window.dispatchEvent(new CustomEvent('file-tree-context-menu', {
-      detail: { x: e.clientX, y: e.clientY, node } as ContextMenuState
-    }))
-  }, [node])
-
-  const handleRenameKeyDown = useCallback(async (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      const trimmed = newName.trim()
-      if (trimmed && trimmed !== node.name) {
-        await window.electronAPI.renameFile({ filePath: node.path, newName: trimmed })
-        onRefresh?.()
-      }
-      onStartRename('')
-    } else if (e.key === 'Escape') {
-      onStartRename('')
-    }
-  }, [newName, node, onRefresh, onStartRename])
+    onContextMenu(e, node)
+  }, [node, onContextMenu])
 
   return (
     <div>
@@ -83,140 +48,162 @@ const FileTreeItem = memo(function FileTreeItem({ node, onFileClick, depth = 0, 
         title={node.path}
       >
         {isDir ? (
-          <span className={`file-tree-arrow${expanded ? ' file-tree-arrow--expanded' : ''}`}>▶</span>
+          <span className={`file-tree-arrow${expanded ? ' file-tree-arrow--expanded' : ''}`}>&#9654;</span>
         ) : (
           <span className="file-tree-icon"><IconForFile name={node.name} /></span>
         )}
-        <span className="file-tree-name">
-          {isRenaming ? (
-            <input
-              ref={inputRef}
-              value={newName}
-              onChange={e => setNewName(e.target.value)}
-              onBlur={() => onStartRename('')}
-              onKeyDown={handleRenameKeyDown}
-              onClick={e => e.stopPropagation()}
-            />
-          ) : node.name}
-        </span>
+        <span className="file-tree-name">{node.name}</span>
       </div>
       {isDir && (
         <div className={`file-tree-children${expanded ? ' file-tree-children--open' : ''}`}>
-          {node.children && node.children.map(child => (
-            <FileTreeItem
-              key={child.path}
-              node={child}
-              depth={depth + 1}
-              onFileClick={onFileClick}
-              directoryPath={directoryPath}
-              onRefresh={onRefresh}
-              renamingPath={renamingPath}
-              onStartRename={onStartRename}
-              onLoadChildren={onLoadChildren}
-            />
-          ))}
+          {node.children && (
+            <FileTreeItems nodes={node.children} onFileClick={onFileClick} directoryPath={directoryPath} depth={depth + 1} onContextMenu={onContextMenu} />
+          )}
         </div>
       )}
     </div>
   )
-})
+}
 
-export default function FileTree({ tree, onFileClick, depth = 0, directoryPath, onRefresh, onLoadChildren }: FileTreeProps) {
-  const [menu, setMenu] = useState<ContextMenuState | null>(null)
-  const [renamingPath, setRenamingPath] = useState<string | null>(null)
-  const menuRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const ce = e as CustomEvent<ContextMenuState>
-      setMenu(ce.detail)
-    }
-    window.addEventListener('file-tree-context-menu', handler)
-    return () => window.removeEventListener('file-tree-context-menu', handler)
-  }, [])
-
-  useEffect(() => {
-    const close = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenu(null)
-    }
-    if (menu) {
-      document.addEventListener('mousedown', close)
-      return () => document.removeEventListener('mousedown', close)
-    }
-  }, [menu])
-
-  const execute = useCallback(async (action: string, node: FileNode) => {
-    switch (action) {
-      case 'open':
-        onFileClick(node)
-        break
-      case 'open-browser': {
-        const res = await window.electronAPI.openFile(node.path)
-        if ('content' in res) openFile(node.path, node.name, res.content, res.language)
-        break
-      }
-      case 'reveal':
-        window.electronAPI.revealInExplorer(node.path)
-        break
-      case 'terminal':
-        window.electronAPI.createTerminal(node.path)
-        break
-      case 'copy':
-        navigator.clipboard.writeText(node.path)
-        break
-      case 'copy-path':
-        window.electronAPI.copyFilePath(node.path)
-        break
-      case 'copy-relative':
-        if (directoryPath) window.electronAPI.copyFileRelativePath({ filePath: node.path, cwd: directoryPath })
-        break
-      case 'rename':
-        setRenamingPath(node.path)
-        break
-      case 'delete':
-        await window.electronAPI.deleteFile(node.path)
-        onRefresh?.()
-        break
-    }
-    setMenu(null)
-  }, [directoryPath, onFileClick, onRefresh])
-
+function FileTreeItems({ nodes, onFileClick, directoryPath, depth, onContextMenu }: {
+  nodes: FileNode[]
+  onFileClick: (node: FileNode) => void
+  directoryPath?: string | null
+  depth: number
+  onContextMenu: (e: React.MouseEvent, node: FileNode) => void
+}) {
   return (
-    <div className="file-tree">
-      {tree.map(node => (
+    <div>
+      {nodes.map(node => (
         <FileTreeItem
           key={node.path}
           node={node}
-          depth={depth}
           onFileClick={onFileClick}
           directoryPath={directoryPath}
-          onRefresh={onRefresh}
-          renamingPath={renamingPath}
-          onStartRename={setRenamingPath}
-          onLoadChildren={onLoadChildren}
+          depth={depth}
+          onContextMenu={onContextMenu}
         />
       ))}
+    </div>
+  )
+}
+
+export default function FileTree({ tree, onFileClick, directoryPath, depth = 0 }: FileTreeProps) {
+  const [menu, setMenu] = useState<MenuState | null>(null)
+  const { openFile, state, directoryPath: ctxDirPath } = useEditorContext()
+
+  const dirPath = directoryPath ?? ctxDirPath
+
+  const closeMenu = useCallback(() => setMenu(null), [])
+
+  const handleContextMenu = useCallback((e: React.MouseEvent, node: FileNode) => {
+    setMenu({ x: e.clientX, y: e.clientY, node })
+  }, [])
+
+  const buildMenuItems = useCallback((): ContextMenuItem[] => {
+    if (!menu) return []
+    const { node } = menu
+    const isFile = node.type === 'file'
+    const relativePath = dirPath ? node.path.replace(dirPath, '').replace(/^[/\\]/, '') : node.name
+
+    return [
+      // Open
+      isFile && {
+        label: 'Open to the Side',
+        shortcut: 'Ctrl+\\',
+        action: () => onFileClick(node)
+      },
+      isFile && {
+        label: 'Open in Browser',
+        action: () => {
+          if (node.language === 'html' || node.name.endsWith('.html')) {
+            window.electronAPI.openExternal('file://' + node.path)
+          }
+        },
+        disabled: !(node.language === 'html' || node.name.endsWith('.html'))
+      },
+      isFile && { label: 'Open With...', disabled: true },
+      { divider: true },
+      // Reveal & Terminal
+      {
+        label: 'Reveal in File Explorer',
+        shortcut: 'Shift+Alt+R',
+        action: () => window.electronAPI.revealInFolder(node.path)
+      },
+      isDir && {
+        label: 'Open in Integrated Terminal',
+        action: () => {
+          window.electronAPI.createTerminal(node.path)
+        }
+      },
+      { divider: true },
+      // Compare
+      isFile && { label: 'Select for Compare', disabled: true },
+      { divider: true },
+      // Clipboard
+      {
+        label: 'Cut',
+        shortcut: 'Ctrl+X',
+        disabled: true
+      },
+      {
+        label: 'Copy',
+        shortcut: 'Ctrl+C',
+        disabled: true
+      },
+      {
+        label: 'Copy Path',
+        shortcut: 'Shift+Alt+C',
+        action: () => window.electronAPI.clipboardWriteText(node.path)
+      },
+      {
+        label: 'Copy Relative Path',
+        shortcut: 'Ctrl+M Ctrl+Shift+C',
+        action: () => window.electronAPI.clipboardWriteText(relativePath)
+      },
+      { divider: true },
+      // Rename & Delete
+      {
+        label: 'Rename...',
+        shortcut: 'F2',
+        action: () => {
+          const newName = window.prompt('Rename to:', node.name)
+          if (newName && newName !== node.name) {
+            window.electronAPI.renameFile(node.path, newName).then(result => {
+              if ('error' in result && result.error) {
+                window.alert(result.error)
+              }
+            })
+          }
+        }
+      },
+      {
+        label: 'Delete',
+        shortcut: 'Delete',
+        danger: true,
+        action: () => {
+          if (window.confirm(`Are you sure you want to delete '${node.name}'?`)) {
+            window.electronAPI.deleteFile(node.path).then(result => {
+              if ('error' in result && result.error) {
+                window.alert(result.error)
+              }
+            })
+          }
+        }
+      }
+    ].filter(Boolean) as ContextMenuItem[]
+  }, [menu, dirPath, onFileClick])
+
+  return (
+    <div className="file-tree">
+      <FileTreeItems nodes={tree} onFileClick={onFileClick} directoryPath={dirPath} depth={depth} onContextMenu={handleContextMenu} />
       {menu && (
-        <div
-          ref={menuRef}
-          className="ctx-menu"
-          style={{ left: menu.x, top: menu.y }}
-        >
-          <div className="ctx-menu-item" onClick={() => execute('open', menu.node)}>Open to the Side</div>
-          <div className="ctx-menu-item" onClick={() => execute('open-browser', menu.node)}>Open in Browser</div>
-          <div className="ctx-menu-sep" />
-          <div className="ctx-menu-item" onClick={() => execute('reveal', menu.node)}>Reveal in File Explorer</div>
-          <div className="ctx-menu-item" onClick={() => execute('terminal', menu.node)}>Open in Integrated Terminal</div>
-          <div className="ctx-menu-sep" />
-          <div className="ctx-menu-item" onClick={() => execute('copy', menu.node)}>Copy</div>
-          <div className="ctx-menu-item" onClick={() => execute('copy-path', menu.node)}>Copy Path</div>
-          {directoryPath && (
-            <div className="ctx-menu-item" onClick={() => execute('copy-relative', menu.node)}>Copy Relative Path</div>
-          )}
-          <div className="ctx-menu-sep" />
-          <div className="ctx-menu-item" onClick={() => execute('rename', menu.node)}>Rename...</div>
-          <div className="ctx-menu-item" onClick={() => execute('delete', menu.node)}>Delete</div>
-        </div>
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          items={buildMenuItems()}
+          onClose={closeMenu}
+        />
       )}
     </div>
   )

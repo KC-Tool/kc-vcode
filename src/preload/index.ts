@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, shell } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
 
 export interface FileNode {
   name: string
@@ -38,11 +38,11 @@ export interface ElectronAPI {
   saveSettings: (data: Record<string, unknown>) => Promise<boolean>
   createFile: (dirPath: string, name: string) => Promise<{ success?: boolean; path?: string; error?: string }>
   createFolder: (dirPath: string, name: string) => Promise<{ success?: boolean; path?: string; error?: string }>
+  revealInFolder: (filePath: string) => Promise<void>
+  openExternal: (url: string) => Promise<void>
   deleteFile: (filePath: string) => Promise<{ success?: boolean; error?: string }>
-  renameFile: (data: { filePath: string; newName: string }) => Promise<{ success?: boolean; path?: string; error?: string }>
-  copyFilePath: (filePath: string) => Promise<{ success?: boolean }>
-  copyFileRelativePath: (data: { filePath: string; cwd: string }) => Promise<{ success?: boolean }>
-  revealInExplorer: (filePath: string) => Promise<{ success?: boolean; error?: string }>
+  renameFile: (oldPath: string, newName: string) => Promise<{ success?: boolean; newPath?: string; error?: string }>
+  clipboardWriteText: (text: string) => Promise<void>
   gitStatus: (cwd: string) => Promise<any>
   gitDiff: (cwd: string, filePath?: string) => Promise<string>
   gitLog: (cwd: string, count?: number) => Promise<any[]>
@@ -142,26 +142,20 @@ const electronAPI = {
   createFolder: (dirPath: string, name: string): Promise<{ success?: boolean; path?: string; error?: string }> =>
     ipcRenderer.invoke('folder:create', { dirPath, name }),
 
+  revealInFolder: (filePath: string): Promise<void> =>
+    ipcRenderer.invoke('shell:revealInFolder', filePath),
+
+  openExternal: (url: string): Promise<void> =>
+    ipcRenderer.invoke('shell:openExternal', url),
+
   deleteFile: (filePath: string): Promise<{ success?: boolean; error?: string }> =>
     ipcRenderer.invoke('file:delete', filePath),
 
-  renameFile: (data: { filePath: string; newName: string }): Promise<{ success?: boolean; path?: string; error?: string }> =>
-    ipcRenderer.invoke('file:rename', data),
+  renameFile: (oldPath: string, newName: string): Promise<{ success?: boolean; newPath?: string; error?: string }> =>
+    ipcRenderer.invoke('file:rename', { oldPath, newName }),
 
-  copyFilePath: (filePath: string): Promise<{ success?: boolean }> =>
-    ipcRenderer.invoke('file:copyPath', filePath),
-
-  copyFileRelativePath: (data: { filePath: string; cwd: string }): Promise<{ success?: boolean }> =>
-    ipcRenderer.invoke('file:copyRelativePath', data),
-
-  revealInExplorer: (filePath: string): Promise<{ success?: boolean; error?: string }> => {
-    try {
-      shell.showItemInFolder(filePath)
-      return { success: true }
-    } catch (err: unknown) {
-      return { error: err instanceof Error ? err.message : String(err) }
-    }
-  },
+  clipboardWriteText: (text: string): Promise<void> =>
+    ipcRenderer.invoke('clipboard:writeText', text),
 
   gitStatus: (cwd: string) => ipcRenderer.invoke('git:status', cwd),
   gitDiff: (cwd: string, filePath?: string) => ipcRenderer.invoke('git:diff', cwd, filePath),

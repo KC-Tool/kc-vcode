@@ -38,19 +38,22 @@ function getLanguage(filePath: string): string {
   return map[ext] || 'plaintext'
 }
 
-async function readDirRecursive(dirPath: string, depth = 0): Promise<FileNode[]> {
-  if (depth > 0) return []
+function readDirRecursive(dirPath: string, depth = 0): FileNode[] {
+  if (depth > 8) return []
   const result: FileNode[] = []
-  const ignore = new Set(['node_modules', '.git', '.svn', 'out', 'dist', 'target'])
 
   try {
-    const entries = await fs.promises.readdir(dirPath, { withFileTypes: true })
+    const entries = fs.readdirSync(dirPath, { withFileTypes: true })
+    const ignore = new Set(['node_modules', '.git', '.svn', 'out', 'dist', 'target'])
+
     for (const entry of entries) {
       if (ignore.has(entry.name)) continue
       if (entry.name.startsWith('.')) continue
+
       const fullPath = path.join(dirPath, entry.name)
       if (entry.isDirectory()) {
-        result.push({ name: entry.name, path: fullPath, type: 'directory', children: [] })
+        const children = readDirRecursive(fullPath, depth + 1)
+        result.push({ name: entry.name, path: fullPath, type: 'directory', children })
       } else {
         result.push({ name: entry.name, path: fullPath, type: 'file', language: getLanguage(fullPath) })
       }
@@ -59,13 +62,16 @@ async function readDirRecursive(dirPath: string, depth = 0): Promise<FileNode[]>
     // permission denied
   }
 
-  result.sort((a, b) => a.name.localeCompare(b.name))
+  result.sort((a, b) => {
+    if (a.type !== b.type) return a.type === 'directory' ? -1 : 1
+    return a.name.localeCompare(b.name)
+  })
   return result
 }
 
-async function openFolder(dirPath: string): Promise<void> {
+function openFolder(dirPath: string): void {
   currentDir = dirPath
-  const tree = await readDirRecursive(dirPath)
+  const tree = readDirRecursive(dirPath)
   const rootName = path.basename(dirPath)
   mainWin?.webContents.send('directory:opened', { rootName, rootPath: dirPath, tree })
   if (mainWin) startWatching(dirPath, mainWin)
@@ -388,7 +394,7 @@ function registerIpcHandlers(): void {
     const result = await dialog.showOpenDialog(mainWin, { properties: ['openDirectory'] })
     if (result.canceled || !result.filePaths[0]) return null
     const dirPath = result.filePaths[0]
-    const tree = await readDirRecursive(dirPath)
+    const tree = readDirRecursive(dirPath)
     if (currentDir) stopWatching(currentDir)
     currentDir = dirPath
     startWatching(dirPath, mainWin)
@@ -436,15 +442,15 @@ function registerIpcHandlers(): void {
         currentDir = dirPath
         if (mainWin) startWatching(dirPath, mainWin)
       }
-      return { tree: await readDirRecursive(dirPath) }
+      return { tree: readDirRecursive(dirPath) }
     } catch (err: unknown) {
       return { error: err instanceof Error ? err.message : String(err) }
     }
   })
 
-  ipcMain.handle('file:refreshDir', async (_, dirPath: string) => {
+  ipcMain.handle('file:refreshDir', (_, dirPath: string) => {
     try {
-      return { tree: await readDirRecursive(dirPath) }
+      return { tree: readDirRecursive(dirPath) }
     } catch (err: unknown) {
       return { error: err instanceof Error ? err.message : String(err) }
     }
@@ -509,45 +515,43 @@ function registerIpcHandlers(): void {
     }
   })
 
-  ipcMain.handle('file:delete', (_, filePath: string) => {
+  // file context menu operations
+  ipcMain.handle('shell:revealInFolder', (_, filePath: string) => {
+    shell.showItemInFolder(filePath)
+  })
+
+  ipcMain.handle('shell:openExternal', (_, url: string) => {
+    shell.openExternal(url)
+  })
+
+  ipcMain.handle('file:delete', async (_, filePath: string) => {
     try {
-      fs.unlinkSync(filePath)
+      const stat = fs.statSync(filePath)
+      if (stat.isDirectory()) {
+        fs.rmSync(filePath, { recursive: true, force: true })
+      } else {
+        fs.unlinkSync(filePath)
+      }
       return { success: true }
     } catch (err: unknown) {
       return { error: err instanceof Error ? err.message : String(err) }
     }
   })
 
-  ipcMain.handle('file:rename', (_, data: { filePath: string; newName: string }) => {
+  ipcMain.handle('file:rename', async (_, data: { oldPath: string; newName: string }) => {
     try {
-      const dir = path.dirname(data.filePath)
+      const dir = path.dirname(data.oldPath)
       const newPath = path.join(dir, data.newName)
-      if (fs.existsSync(newPath)) return { error: 'Target already exists' }
-      fs.renameSync(data.filePath, newPath)
-      return { success: true, path: newPath }
+      if (fs.existsSync(newPath)) return { error: 'A file or folder with that name already exists' }
+      fs.renameSync(data.oldPath, newPath)
+      return { success: true, newPath }
     } catch (err: unknown) {
       return { error: err instanceof Error ? err.message : String(err) }
     }
   })
 
-  ipcMain.handle('file:copyPath', (_, filePath: string) => {
-    clipboard.writeText(filePath)
-    return { success: true }
-  })
-
-  ipcMain.handle('file:copyRelativePath', (_, data: { filePath: string; cwd: string }) => {
-    const rel = path.relative(data.cwd, data.filePath)
-    clipboard.writeText(rel)
-    return { success: true }
-  })
-
-  ipcMain.handle('file:revealInExplorer', (_, filePath: string) => {
-    try {
-      shell.showItemInFolder(filePath)
-      return { success: true }
-    } catch (err: unknown) {
-      return { error: err instanceof Error ? err.message : String(err) }
-    }
+  ipcMain.handle('clipboard:writeText', (_, text: string) => {
+    clipboard.writeText(text)
   })
 
   // git
