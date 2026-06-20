@@ -1,5 +1,5 @@
 import React, { useRef, useCallback, useEffect, useState } from 'react'
-import Editor, { OnMount, OnChange } from '@monaco-editor/react'
+import Editor, { OnMount } from '@monaco-editor/react'
 import { useEditorContext } from '../contexts/EditorContext'
 import { useSettings } from '../contexts/SettingsContext'
 import MarkdownPreview from './MarkdownPreview'
@@ -23,12 +23,21 @@ self.MonacoEnvironment = {
   }
 }
 
+interface CursorPosition {
+  lineNumber: number
+  column: number
+}
+
 export default function EditorPane() {
   const { state, updateContent, markSaved, setCursor, setMarkers } = useEditorContext()
   const { settings } = useSettings()
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null)
   const monacoRef = useRef<any>(null)
   const [previewMode, setPreviewMode] = useState(false)
+
+  // cursor history for back/forward navigation
+  const cursorHistoryRef = useRef<CursorPosition[]>([])
+  const cursorIndexRef = useRef<number>(-1)
 
   const activeFile = state.activeTabId ? state.files[state.activeTabId] : null
   const isMarkdown = activeFile?.language === 'markdown'
@@ -44,6 +53,7 @@ export default function EditorPane() {
     if ('success' in result && result.success) markSaved(activeFile.path)
   }, [activeFile, markSaved])
 
+  // auto-save
   useEffect(() => {
     if (!settings.files.autoSave || !activeFile) return
     if (activeFile.content === activeFile.originalContent) return
@@ -55,11 +65,36 @@ export default function EditorPane() {
     editorRef.current = editor
     monacoRef.current = monaco
 
+    // track cursor position changes for history
+    let lastPos: CursorPosition | null = null
     editor.onDidChangeCursorPosition((e) => {
       if (activeFile) setCursor(activeFile.path, e.position.lineNumber, e.position.column)
+
+      const pos = e.position
+      // avoid adding consecutive same positions
+      if (lastPos && lastPos.lineNumber === pos.lineNumber && lastPos.column === pos.column) return
+      // avoid adding positions from programmatic navigation
+      if (e.source === 'api') return
+
+      lastPos = pos
+      const hist = cursorHistoryRef.current
+      const idx = cursorIndexRef.current
+
+      // truncate forward history when user moves cursor manually
+      if (idx < hist.length - 1) {
+        hist.splice(idx + 1)
+      }
+      // avoid duplicate adjacent entries
+      if (hist.length === 0 || hist[hist.length - 1].lineNumber !== pos.lineNumber || hist[hist.length - 1].column !== pos.column) {
+        hist.push({ lineNumber: pos.lineNumber, column: pos.column })
+        // cap history size
+        if (hist.length > 200) hist.shift()
+      }
+      cursorIndexRef.current = hist.length - 1
     })
 
-    monaco.editor.onDidChangeMarkers((e) => {
+    // markers listener
+    monaco.editor.onDidChangeMarkers(() => {
       const allMarkers = monaco.editor.getModelMarkers({})
       const mapped = allMarkers.map(m => ({
         file: m.resource?.path || m.source || '',
@@ -71,7 +106,29 @@ export default function EditorPane() {
       setMarkers(mapped)
     })
 
+    // Ctrl+S save
     editor.addCommand(2048 | 49, () => handleSave())
+
+    // cursor history navigation: Alt+Left = back, Alt+Right = forward
+    editor.addCommand(512 | 17, () => { // Alt+Left
+      const hist = cursorHistoryRef.current
+      if (hist.length === 0) return
+      if (cursorIndexRef.current > 0) {
+        cursorIndexRef.current--
+        const pos = hist[cursorIndexRef.current]
+        editor.setPosition(pos)
+        editor.revealLineInCenter(pos.lineNumber)
+      }
+    })
+    editor.addCommand(512 | 19, () => { // Alt+Right
+      const hist = cursorHistoryRef.current
+      if (cursorIndexRef.current < hist.length - 1) {
+        cursorIndexRef.current++
+        const pos = hist[cursorIndexRef.current]
+        editor.setPosition(pos)
+        editor.revealLineInCenter(pos.lineNumber)
+      }
+    })
 
     // register custom completions per language
     for (const [lang, snippets] of Object.entries(allSnippets)) {
@@ -98,35 +155,25 @@ export default function EditorPane() {
       })
     }
 
-    // tab completion with diff decoration
+    // tab completion
     editor.addAction({
       id: 'tab-complete-diff',
       label: 'Tab Complete',
-      keybindings: [9], // Tab key
+      keybindings: [9],
       run: (ed) => {
-        const model = ed.getModel()
-        if (!model) return
-
-        const pos = ed.getPosition()
-        if (!pos) return
-
-        // check if suggest widget is open
         const suggestController = ed.getContribution('editor.contrib.suggestController')
         if (suggestController && (suggestController as any)._suggestWidget?.isVisible()) {
-          // let suggest widget handle it normally
           ed.trigger('keyboard', 'editor.action.suggestInsert', null)
           return
         }
-
-        // no suggest open — insert tab
         ed.trigger('keyboard', 'editor.action.insertTab', null)
       }
     })
 
     editor.focus()
-  }, [activeFile, handleSave, setCursor])
+  }, [activeFile, handleSave, setCursor, setMarkers])
 
-  // show diff decoration after completion insert
+  // diff highlight decoration
   useEffect(() => {
     const editor = editorRef.current
     const monaco = monacoRef.current
@@ -137,7 +184,6 @@ export default function EditorPane() {
 
     const disposable = editor.onDidChangeModelContent((e) => {
       if (!e.changes.length) return
-      // find insertions that span multiple lines (snippet inserts)
       for (const change of e.changes) {
         const insertedLines = change.text.split('\n').length
         if (insertedLines > 1) {
@@ -145,8 +191,6 @@ export default function EditorPane() {
           const endLine = startLine + insertedLines - 1
           const model = editor.getModel()
           if (!model) return
-
-          // clear old decorations
           decoIds = editor.deltaDecorations(decoIds, [
             {
               range: new monaco.Range(startLine, 1, endLine, model.getLineMaxColumn(endLine)),
@@ -157,8 +201,6 @@ export default function EditorPane() {
               }
             }
           ])
-
-          // auto-clear after 2s
           if (timer) clearTimeout(timer)
           timer = setTimeout(() => {
             decoIds = editor.deltaDecorations(decoIds, [])
@@ -173,45 +215,78 @@ export default function EditorPane() {
     }
   }, [state.activeTabId])
 
+  // error lens: inline decorations for markers
+  useEffect(() => {
+    const editor = editorRef.current
+    const monaco = monacoRef.current
+    if (!editor || !monaco) return
+
+    let decoIds: string[] = []
+
+    const updateErrorLens = () => {
+      const model = editor.getModel()
+      if (!model) return
+      const markers = monaco.editor.getModelMarkers({ resource: model.uri })
+      if (!markers.length) {
+        decoIds = editor.deltaDecorations(decoIds, [])
+        return
+      }
+
+      const decorations = markers
+        .filter(m => m.severity === 8 || m.severity === 4) // error or warning
+        .map(m => {
+          const maxCol = model.getLineMaxColumn(m.startLineNumber)
+          const icon = m.severity === 8 ? '\u2716' : '\u26A0'
+          const color = m.severity === 8 ? '#f44747' : '#cca700'
+          return {
+            range: new monaco.Range(m.startLineNumber, maxCol, m.startLineNumber, maxCol),
+            options: {
+              after: {
+                content: ` ${icon} ${m.message}`,
+                inlineClassName: `error-lens-inline ${m.severity === 8 ? 'error-lens-error' : 'error-lens-warning'}`,
+                color,
+                fontStyle: 'italic',
+                fontSize: '12px'
+              },
+              stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges
+            }
+          }
+        })
+
+      decoIds = editor.deltaDecorations(decoIds, decorations)
+    }
+
+    updateErrorLens()
+
+    const disposable = monaco.editor.onDidChangeMarkers(() => {
+      updateErrorLens()
+    })
+
+    return () => {
+      disposable.dispose()
+      editor.deltaDecorations(decoIds, [])
+    }
+  }, [state.activeTabId])
+
+  // focus on tab switch
   useEffect(() => {
     if (editorRef.current && activeFile) editorRef.current.focus()
   }, [state.activeTabId])
 
-  // sync monaco theme with app theme
+  // sync theme
   useEffect(() => {
     const monaco = monacoRef.current
     if (!monaco) return
     monaco.editor.setTheme(monacoTheme)
   }, [monacoTheme])
 
+  // request save from menu
   useEffect(() => {
     window.electronAPI.onRequestSave(() => handleSave())
     return () => { window.electronAPI.removeAllListeners('file:requestSave') }
   }, [handleSave])
 
-  useEffect(() => {
-    if (!settings.files.autoSave || !activeFile) return
-    if (activeFile.content === activeFile.originalContent) return
-    const t = setTimeout(() => { handleSave() }, 1500)
-    return () => clearTimeout(t)
-  }, [activeFile, settings.files.autoSave, handleSave])
-
-  const autoPath = activeFile?.path
-  const autoContent = activeFile?.content
-  const autoDirty = activeFile?.isDirty
-
-  useEffect(() => {
-    if (!settings.files.autoSave) return
-    if (!autoPath || !autoContent || !autoDirty) return
-    const id = setTimeout(() => {
-      window.electronAPI.saveFile({ path: autoPath, content: autoContent }).then(r => {
-        if ('success' in r && r.success) markSaved(autoPath)
-      })
-    }, 1500)
-    return () => clearTimeout(id)
-  }, [autoPath, autoContent, autoDirty, settings.files.autoSave, markSaved])
-
-  // Go to Line
+  // go to line
   useEffect(() => {
     const handler = (e: Event) => {
       const line = (e as CustomEvent).detail
@@ -225,7 +300,7 @@ export default function EditorPane() {
     return () => document.removeEventListener('editor:goToLine', handler)
   }, [state.activeTabId])
 
-  // settings tab — no file data needed
+  // settings tab
   const isSettings = state.tabs.find(t => t.id === state.activeTabId)?.isSettings
   if (isSettings) {
     return (
@@ -269,39 +344,93 @@ export default function EditorPane() {
             onChange={(v) => { if (v !== undefined) updateContent(activeFile.path, v) }}
             onMount={handleEditorMount}
             options={{
+              // font
               fontSize: ed.fontSize,
               fontFamily: ed.fontFamily,
               fontLigatures: true,
-              minimap: { enabled: ed.minimap },
+              lineHeight: 1.6,
+
+              // minimap
+              minimap: { enabled: ed.minimap, renderCharacters: false, maxColumn: 80 },
+
+              // display
               lineNumbers: ed.lineNumbers ? 'on' : 'off',
               renderWhitespace: 'selection',
-              tabSize: ed.tabSize,
-              insertSpaces: true,
               wordWrap: ed.wordWrap,
               scrollBeyondLastLine: false,
               automaticLayout: true,
+              padding: { top: 12, bottom: 12 },
+              renderLineHighlight: 'all',
+              renderLineHighlightOnlyWhenFocus: false,
+
+              // scrolling
               smoothScrolling: ed.smoothScrolling,
+              mouseWheelScrollSensitivity: 1.2,
+              fastScrollSensitivity: 5,
+
+              // cursor
               cursorBlinking: ed.cursorBlinking,
               cursorSmoothCaretAnimation: 'on',
-              bracketPairColorization: { enabled: true },
+              cursorWidth: 2,
+              cursorInvertSelection: false,
+
+              // editing
+              tabSize: ed.tabSize,
+              insertSpaces: true,
+              autoIndent: 'advanced',
+              formatOnPaste: true,
+              formatOnType: true,
+
+              // bracket
+              bracketPairColorization: { enabled: true, independentColorPoolPerBracketType: true },
               autoClosingBrackets: 'always',
               autoClosingQuotes: 'always',
-              formatOnPaste: true,
+              autoSurround: 'languageDefined',
+
+              // suggestions
               suggestOnTriggerCharacters: true,
-              quickSuggestions: true,
-              parameterHints: { enabled: true },
-              folding: true,
-              foldingHighlight: true,
-              guides: { indentation: true, bracketPairs: true },
-              selectionHighlight: true,
-              occurrencesHighlight: 'singleFile',
-              renderLineHighlight: 'all',
-              padding: { top: 8 },
+              quickSuggestions: { other: true, comments: true, strings: true },
+              parameterHints: { enabled: true, cycle: true },
               suggestSelection: 'first',
               acceptSuggestionOnCommitCharacter: true,
               acceptSuggestionOnEnter: 'on',
               snippetSuggestions: 'inline',
-              tabCompletion: 'on'
+              tabCompletion: 'on',
+              wordBasedSuggestions: 'currentDocument',
+
+              // folding
+              folding: true,
+              foldingHighlight: true,
+              showFoldingControls: 'mouseover',
+              foldingStrategy: 'indentation',
+
+              // guides
+              guides: {
+                indentation: true,
+                bracketPairs: true,
+                bracketPairsHorizontal: true,
+                highlightActiveBracketPair: true,
+                indentationLines: true
+              },
+
+              // selection
+              selectionHighlight: true,
+              occurrencesHighlight: 'singleFile',
+              selectOnLineNumbers: true,
+
+              // sticky scroll
+              stickyScroll: { enabled: true },
+
+              // inline suggest
+              inlineSuggest: { enabled: true },
+
+              // misc
+              contextmenu: true,
+              copyWithSyntaxHighlighting: true,
+              multiCursorModifier: 'ctrlCmd',
+              linkedEditing: true,
+              colorDecorators: true,
+             OccurrencesHighlight: 'singleFile' as any
             }}
           />
         )}

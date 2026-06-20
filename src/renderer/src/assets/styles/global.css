@@ -1723,3 +1723,26 @@ body {
   margin: 4px 0;
 }
 
+/* ── error lens (inline diagnostics) ── */
+.error-lens-inline {
+  font-family: var(--font-mono);
+  font-size: 12px !important;
+  font-style: italic;
+  margin-left: 12px;
+  padding-left: 8px;
+  border-left: 2px solid;
+  opacity: 0.85;
+}
+
+.error-lens-error {
+  color: #f44747 !important;
+  border-left-color: #f44747;
+  background: rgba(244, 71, 71, 0.06);
+}
+
+.error-lens-warning {
+  color: #cca700 !important;
+  border-left-color: #cca700;
+  background: rgba(204, 167, 0, 0.06);
+}
+
