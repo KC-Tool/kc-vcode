@@ -104,6 +104,7 @@ export default function FileTree({ tree, onFileClick, directoryPath, depth = 0 }
     if (!menu) return []
     const { node } = menu
     const isFile = node.type === 'file'
+    const isDir = node.type === 'directory'
     const relativePath = dirPath ? node.path.replace(dirPath, '').replace(/^[/\\]/, '') : node.name
 
     return [
