@@ -7,7 +7,7 @@ import Sidebar from './components/Sidebar'
 import EditorPane from './components/Editor'
 import StatusBar from './components/StatusBar'
 import WelcomePage from './components/WelcomePage'
-import TerminalPanel from './components/Terminal'
+import BottomPanel from './components/BottomPanel'
 import CommandPalette from './components/CommandPalette'
 import GoToLine from './components/GoToLine'
 import { FileNode } from '../../preload/index'
@@ -142,7 +142,7 @@ function AppContent() {
         <div className="editor-area">
           {hasTabs && <TabBar />}
           {hasTabs ? <EditorPane /> : <WelcomePage onOpenFolder={handleOpenFolder} />}
-          <TerminalPanel cwd={dirPathRef.current || undefined} visible={termVisible} theme={state.theme} />
+          <BottomPanel cwd={dirPathRef.current || undefined} visible={termVisible} theme={state.theme} onClose={() => setTermVisible(false)} onOpenFile={async (filePath) => { const res = await window.electronAPI.openFile(filePath); if ('error' in res) return; openFile(filePath, filePath.split(/[/\\]/).pop() || '', res.content, res.language) }} />
         </div>
       </div>
       <StatusBar onToggleTerminal={() => setTermVisible(v => !v)} />

@@ -1,18 +1,20 @@
 import React, { useState } from 'react'
 import ProblemsPanel from './ProblemsPanel'
 import TerminalPanel from './Terminal'
+import DebugToolbar from './DebugToolbar'
 import { useEditorContext } from '../contexts/EditorContext'
 
-type BottomTab = 'problems' | 'terminal'
+type BottomTab = 'problems' | 'terminal' | 'debug'
 
 interface Props {
   cwd?: string
   visible: boolean
   theme: 'dark' | 'light'
   onClose: () => void
+  onOpenFile: (path: string) => void
 }
 
-export default function BottomPanel({ cwd, visible, theme, onClose }: Props) {
+export default function BottomPanel({ cwd, visible, theme, onClose, onOpenFile }: Props) {
   const [activeTab, setActiveTab] = useState<BottomTab>('terminal')
   const { state } = useEditorContext()
   const errCount = state.markers.filter(m => m.severity === 'error').length
@@ -39,6 +41,12 @@ export default function BottomPanel({ cwd, visible, theme, onClose }: Props) {
           >
             Terminal
           </div>
+          <div
+            className={`bp-tab${activeTab === 'debug' ? ' bp-tab--active' : ''}`}
+            onClick={() => setActiveTab('debug')}
+          >
+            Debug
+          </div>
         </div>
         <div className="bp-actions">
           <button className="bp-action" onClick={onClose} title="Close Panel">×</button>
@@ -47,6 +55,7 @@ export default function BottomPanel({ cwd, visible, theme, onClose }: Props) {
       <div className="bp-body">
         {activeTab === 'problems' && <ProblemsPanel />}
         {activeTab === 'terminal' && <TerminalPanel cwd={cwd} visible={true} theme={theme} />}
+        {activeTab === 'debug' && <DebugToolbar onOpenFile={onOpenFile} />}
       </div>
     </div>
   )

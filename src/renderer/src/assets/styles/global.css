@@ -1962,3 +1962,142 @@ body {
   cursor: default;
 }
 
+/* ── debug panel ── */
+.debug-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+
+.debug-btn {
+  background: none;
+  border: none;
+  color: var(--fg-secondary);
+  cursor: pointer;
+  width: 28px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  transition: background var(--duration-fast) var(--ease-out),
+              color var(--duration-fast) var(--ease-out);
+}
+
+.debug-btn:hover {
+  background: var(--bg-hover);
+  color: var(--fg-primary);
+}
+
+.debug-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.debug-btn--start {
+  color: var(--fg-accent);
+}
+
+.debug-btn--stop {
+  color: #f44747;
+}
+
+.debug-status {
+  font-size: 11px;
+  color: var(--fg-muted);
+  margin-left: 8px;
+}
+
+.debug-section {
+  margin-bottom: 8px;
+}
+
+.debug-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--fg-muted);
+  padding: 4px 0 2px;
+}
+
+.debug-stack-frame {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 8px;
+  font-size: 12px;
+  color: var(--fg-secondary);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.debug-stack-frame:hover {
+  background: var(--bg-hover);
+}
+
+.debug-stack-frame--active {
+  background: var(--bg-active);
+  color: var(--fg-primary);
+}
+
+.debug-frame-name {
+  font-family: var(--font-mono);
+}
+
+.debug-frame-location {
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+
+.debug-variable {
+  display: flex;
+  align-items: baseline;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.debug-var-name {
+  color: var(--fg-accent);
+}
+
+.debug-var-sep {
+  color: var(--fg-muted);
+  margin: 0 2px;
+}
+
+.debug-var-value {
+  color: var(--fg-primary);
+}
+
+.debug-var-result {
+  padding: 4px 8px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--fg-secondary);
+}
+
+.debug-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  color: var(--fg-muted);
+}
+
+.debug-empty-text {
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.debug-empty-hint {
+  font-size: 11px;
+  opacity: 0.6;
+}
+
