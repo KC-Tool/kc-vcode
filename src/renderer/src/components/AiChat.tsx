@@ -8,12 +8,24 @@ interface ChatMessage {
   content: string
 }
 
+const PROVIDERS: Record<string, { label: string; models: string[] }> = {
+  openai: { label: 'OpenAI', models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'] },
+  anthropic: { label: 'Anthropic', models: ['claude-sonnet-4-20250514', 'claude-3-5-sonnet-20241022', 'claude-3-haiku-20240307'] }
+}
+
 export default function AiChat() {
   const { state } = useEditorContext()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [configStatus, setConfigStatus] = useState<{ configured: boolean; provider?: string; model?: string }>({ configured: false })
+  const [configured, setConfigured] = useState(false)
+  const [provider, setProvider] = useState('openai')
+  const [model, setModel] = useState('gpt-4o')
+  const [apiKey, setApiKey] = useState('')
+  const [baseUrl, setBaseUrl] = useState('')
+  const [showSetup, setShowSetup] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saveMsg, setSaveMsg] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -22,11 +34,13 @@ export default function AiChat() {
   // check LLM config on mount
   useEffect(() => {
     window.electronAPI.llmGetConfig().then(cfg => {
-      setConfigStatus({
-        configured: !!cfg?.hasApiKey,
-        provider: cfg?.provider,
-        model: cfg?.model
-      })
+      if (cfg?.hasApiKey) {
+        setConfigured(true)
+        setProvider(cfg.provider || 'openai')
+        setModel(cfg.model || 'gpt-4o')
+      } else {
+        setShowSetup(true)
+      }
     })
   }, [])
 
@@ -34,6 +48,21 @@ export default function AiChat() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  const handleSaveConfig = useCallback(async () => {
+    if (!apiKey.trim()) { setSaveMsg('API Key is required'); return }
+    setSaving(true)
+    setSaveMsg('')
+    try {
+      await window.electronAPI.llmConfigure({ provider, apiKey: apiKey.trim(), model, baseUrl: baseUrl.trim() || undefined })
+      setConfigured(true)
+      setShowSetup(false)
+      setSaveMsg('')
+    } catch (err) {
+      setSaveMsg('Failed to save configuration')
+    }
+    setSaving(false)
+  }, [provider, apiKey, model, baseUrl])
 
   const buildContext = useCallback(() => {
     if (!activeFile) return undefined
@@ -89,7 +118,6 @@ export default function AiChat() {
           return updated
         })
       } else if (result.content) {
-        // dispatch event to apply edit to editor
         document.dispatchEvent(new CustomEvent('ai:applyEdit', { detail: result.content }))
         setMessages(prev => {
           const updated = [...prev]
@@ -101,7 +129,6 @@ export default function AiChat() {
       return
     }
 
-    // build context-aware system prompt
     const systemPrompt = `You are an AI coding assistant inside a code editor called kc-vcode. You help with coding questions, writing code, debugging, and explaining code. Be concise and practical. When showing code, use fenced code blocks with the appropriate language tag.`
 
     const chatMessages = [
@@ -111,7 +138,6 @@ export default function AiChat() {
 
     const context = buildContext()
 
-    // use streaming
     await window.electronAPI.llmChatStream({ messages: chatMessages, context })
 
     let assistantContent = ''
@@ -131,7 +157,7 @@ export default function AiChat() {
         window.electronAPI.removeAllLlmListeners()
       }
     })
-  }, [input, loading, messages, buildContext])
+  }, [input, loading, messages, buildContext, activeFile])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -141,25 +167,81 @@ export default function AiChat() {
   }, [sendMessage])
 
   const insertCodeBlock = useCallback((code: string) => {
-    // dispatch custom event to insert code at cursor in editor
     document.dispatchEvent(new CustomEvent('ai:insertCode', { detail: code }))
   }, [])
 
-  if (!configStatus.configured) {
+  // Setup wizard
+  if (!configured || showSetup) {
     return (
       <div className="ai-chat">
         <div className="ai-chat-header">
-          <span className="ai-chat-title">AI Assistant</span>
+          <span className="ai-chat-title">AI Setup</span>
         </div>
-        <div className="ai-chat-empty">
-          <div className="ai-chat-empty-icon">AI</div>
-          <div className="ai-chat-empty-text">Configure your API key in Settings to enable AI features.</div>
+        <div className="ai-setup">
+          <div className="ai-setup-step">
+            <label className="ai-setup-label">Provider</label>
+            <select className="ai-setup-select" value={provider} onChange={e => {
+              setProvider(e.target.value)
+              setModel(PROVIDERS[e.target.value]?.models[0] || '')
+            }}>
+              {Object.entries(PROVIDERS).map(([key, p]) => (
+                <option key={key} value={key}>{p.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="ai-setup-step">
+            <label className="ai-setup-label">API Key</label>
+            <input
+              className="ai-setup-input"
+              type="password"
+              value={apiKey}
+              onChange={e => setApiKey(e.target.value)}
+              placeholder={provider === 'openai' ? 'sk-...' : 'sk-ant-...'}
+              autoFocus
+            />
+            <div className="ai-setup-hint">Your key is stored locally and never shared.</div>
+          </div>
+
+          <div className="ai-setup-step">
+            <label className="ai-setup-label">Model</label>
+            <select className="ai-setup-select" value={model} onChange={e => setModel(e.target.value)}>
+              {(PROVIDERS[provider]?.models || []).map(m => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="ai-setup-step">
+            <label className="ai-setup-label">Base URL <span className="ai-setup-optional">(optional)</span></label>
+            <input
+              className="ai-setup-input"
+              type="text"
+              value={baseUrl}
+              onChange={e => setBaseUrl(e.target.value)}
+              placeholder={provider === 'openai' ? 'https://api.openai.com/v1' : 'https://api.anthropic.com'}
+            />
+            <div className="ai-setup-hint">Leave empty for default API endpoint.</div>
+          </div>
+
+          {saveMsg && <div className="ai-setup-error">{saveMsg}</div>}
+
           <button
-            className="sidebar-empty-btn"
-            onClick={() => document.dispatchEvent(new CustomEvent('editor:openSettings'))}
+            className="ai-setup-btn"
+            onClick={handleSaveConfig}
+            disabled={saving || !apiKey.trim()}
           >
-            Open Settings
+            {saving ? 'Saving...' : 'Save & Start Chat'}
           </button>
+
+          {configured && (
+            <button
+              className="ai-setup-skip"
+              onClick={() => setShowSetup(false)}
+            >
+              Cancel
+            </button>
+          )}
         </div>
       </div>
     )
@@ -169,7 +251,13 @@ export default function AiChat() {
     <div className="ai-chat">
       <div className="ai-chat-header">
         <span className="ai-chat-title">AI Assistant</span>
-        <span className="ai-chat-model">{configStatus.provider} / {configStatus.model}</span>
+        <span className="ai-chat-model">{provider} / {model}</span>
+        <button className="ai-chat-settings-btn" onClick={() => setShowSetup(true)} title="Reconfigure">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+          </svg>
+        </button>
       </div>
       <div className="ai-chat-messages">
         {messages.length === 0 && (
@@ -177,6 +265,9 @@ export default function AiChat() {
             <div className="ai-chat-empty-icon">AI</div>
             <div className="ai-chat-empty-text">
               Ask me anything about your code. I can see your current file and cursor position.
+              <br /><br />
+              <strong>Commands:</strong><br />
+              <code>/edit &lt;instruction&gt;</code> - Edit the current file with natural language
             </div>
           </div>
         )}

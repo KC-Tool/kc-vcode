@@ -1962,6 +1962,123 @@ body {
   cursor: default;
 }
 
+/* ── AI setup wizard ── */
+.ai-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 16px;
+}
+
+.ai-setup-step {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ai-setup-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-secondary);
+}
+
+.ai-setup-optional {
+  font-weight: 400;
+  color: var(--fg-muted);
+  font-size: 11px;
+}
+
+.ai-setup-input {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--fg-primary);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-family: var(--font-ui);
+  outline: none;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.ai-setup-input:focus {
+  border-color: var(--fg-accent);
+}
+
+.ai-setup-select {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--fg-primary);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-family: var(--font-ui);
+  outline: none;
+  cursor: pointer;
+}
+
+.ai-setup-hint {
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+
+.ai-setup-error {
+  font-size: 12px;
+  color: #f44747;
+  padding: 4px 0;
+}
+
+.ai-setup-btn {
+  background: var(--fg-accent);
+  color: #fff;
+  border: none;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-ui);
+  cursor: pointer;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.ai-setup-btn:hover {
+  opacity: 0.9;
+}
+
+.ai-setup-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.ai-setup-skip {
+  background: none;
+  border: none;
+  color: var(--fg-muted);
+  font-size: 12px;
+  font-family: var(--font-ui);
+  cursor: pointer;
+  padding: 4px;
+}
+
+.ai-setup-skip:hover {
+  color: var(--fg-secondary);
+}
+
+.ai-chat-settings-btn {
+  background: none;
+  border: none;
+  color: var(--fg-muted);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-sm);
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.ai-chat-settings-btn:hover {
+  color: var(--fg-primary);
+}
+
 /* ── debug panel ── */
 .debug-toolbar {
   display: flex;
