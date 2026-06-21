@@ -206,14 +206,18 @@ export default function AiChat() {
           <div className="ai-setup-step">
             <label className="ai-setup-label">Model</label>
             <select className="ai-setup-select" value={PROVIDERS[provider]?.models.includes(model) ? model : '__custom__'} onChange={e => {
-              if (e.target.value !== '__custom__') setModel(e.target.value)
+              if (e.target.value === '__custom__') {
+                setModel('')
+              } else {
+                setModel(e.target.value)
+              }
             }}>
               {(PROVIDERS[provider]?.models || []).map(m => (
                 <option key={m} value={m}>{m}</option>
               ))}
               <option value="__custom__">Custom model...</option>
             </select>
-            {(!PROVIDERS[provider]?.models.includes(model) || model === '') && (
+            {!PROVIDERS[provider]?.models.includes(model) && (
               <input
                 className="ai-setup-input"
                 type="text"
