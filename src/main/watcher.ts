@@ -14,7 +14,7 @@ function debounce(cb: () => void, ms: number): ReturnType<typeof setTimeout> {
 }
 
 function startWatch(dirPath: string, win: BrowserWindow, depth = 0): fs.FSWatcher[] {
-  if (depth > 3) return []
+  if (depth > 3) return [] // don't go too deep
   const ignore = new Set(['node_modules', '.git', '.svn', 'out', 'dist', 'target'])
   const result: fs.FSWatcher[] = []
 

@@ -37,26 +37,6 @@ function AppContent() {
     if ('tree' in res) setTree(res.tree)
   }, [])
 
-  const loadChildren = useCallback(async (parentPath: string) => {
-    const res = await window.electronAPI.readDir(parentPath)
-    if ('tree' in res) {
-      setTree(prev => {
-        const update = (nodes: FileNode[]): FileNode[] => {
-          return nodes.map(node => {
-            if (node.path === parentPath) {
-              return { ...node, children: res.tree }
-            }
-            if (node.children) {
-              return { ...node, children: update(node.children) }
-            }
-            return node
-          })
-        }
-        return update(prev)
-      })
-    }
-  }, [])
-
   const handleOpenFolder = useCallback(async () => {
     const result = await window.electronAPI.openDirectory()
     if (result) {
@@ -158,7 +138,6 @@ function AppContent() {
           onRefresh={refreshTree}
           onOpenSettings={openSettings}
           dirPath={dirPathRef.current}
-          onLoadChildren={loadChildren}
         />
         <div className="editor-area">
           {hasTabs && <TabBar />}
