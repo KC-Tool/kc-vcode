@@ -17,8 +17,9 @@ interface Props {
 export default function BottomPanel({ cwd, visible, theme, onClose, onOpenFile }: Props) {
   const [activeTab, setActiveTab] = useState<BottomTab>('terminal')
   const { state } = useEditorContext()
-  const errCount = state.markers.filter(m => m.severity === 'error').length
-  const warnCount = state.markers.filter(m => m.severity === 'warning').length
+  const markers = state?.markers || []
+  const errCount = markers.filter(m => m.severity === 'error').length
+  const warnCount = markers.filter(m => m.severity === 'warning').length
 
   if (!visible) return null
 
