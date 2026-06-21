@@ -6,6 +6,7 @@ import MarkdownPreview from './MarkdownPreview'
 import SettingsView from './SettingsView'
 import Breadcrumbs from './Breadcrumbs'
 import { allSnippets } from '../snippets'
+import { expandAbbreviation } from 'emmet-monaco-es'
 
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker'
@@ -108,6 +109,9 @@ export default function EditorPane() {
 
     // Ctrl+S save
     editor.addCommand(2048 | 49, () => handleSave())
+
+    // Emmet abbreviations (Tab to expand in HTML/CSS)
+    expandAbbreviation(monaco)
 
     // cursor history navigation: Alt+Left = back, Alt+Right = forward
     editor.addCommand(512 | 17, () => { // Alt+Left
