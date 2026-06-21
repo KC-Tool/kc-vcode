@@ -99,6 +99,18 @@ export default function SettingsView() {
                 {settings.appearance.tabBlur}px
               </span>
             </SettingRow>
+            <SettingRow label="Sidebar Width" desc="Width of the sidebar panel (px)">
+              <input type="range" min="180" max="500" step="10"
+                value={settings.appearance.sidebarWidth}
+                onChange={e => {
+                  const v = +e.target.value
+                  update('appearance', 'sidebarWidth', v)
+                  document.documentElement.style.setProperty('--sidebar-width', v + 'px')
+                }} />
+              <span style={{ fontSize: 11, color: 'var(--fg-muted)', minWidth: 36, textAlign: 'right' }}>
+                {settings.appearance.sidebarWidth}px
+              </span>
+            </SettingRow>
           </>
         )}
         {activeCat === 'terminal' && (

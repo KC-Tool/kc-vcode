@@ -205,11 +205,24 @@ export default function AiChat() {
 
           <div className="ai-setup-step">
             <label className="ai-setup-label">Model</label>
-            <select className="ai-setup-select" value={model} onChange={e => setModel(e.target.value)}>
+            <select className="ai-setup-select" value={PROVIDERS[provider]?.models.includes(model) ? model : '__custom__'} onChange={e => {
+              if (e.target.value !== '__custom__') setModel(e.target.value)
+            }}>
               {(PROVIDERS[provider]?.models || []).map(m => (
                 <option key={m} value={m}>{m}</option>
               ))}
+              <option value="__custom__">Custom model...</option>
             </select>
+            {(!PROVIDERS[provider]?.models.includes(model) || model === '') && (
+              <input
+                className="ai-setup-input"
+                type="text"
+                value={model}
+                onChange={e => setModel(e.target.value)}
+                placeholder="e.g. gpt-4o, deepseek-chat, local-model..."
+                style={{ marginTop: 6 }}
+              />
+            )}
           </div>
 
           <div className="ai-setup-step">

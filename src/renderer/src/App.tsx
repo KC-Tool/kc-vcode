@@ -31,6 +31,13 @@ function AppContent() {
     }
   }, [loaded, settings.appearance.theme, state.theme, setTheme])
 
+  // apply sidebar width from settings
+  useEffect(() => {
+    if (loaded) {
+      document.documentElement.style.setProperty('--sidebar-width', settings.appearance.sidebarWidth + 'px')
+    }
+  }, [loaded, settings.appearance.sidebarWidth])
+
   const refreshTree = useCallback(async () => {
     if (!dirPathRef.current) return
     const res = await window.electronAPI.refreshDir(dirPathRef.current)

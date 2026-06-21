@@ -15,6 +15,7 @@ interface Settings {
     theme: 'dark' | 'light'
     fontSize: number
     tabBlur: number
+    sidebarWidth: number
   }
   terminal: {
     fontSize: number
@@ -43,7 +44,8 @@ const defaults: Settings = {
   appearance: {
     theme: 'dark',
     fontSize: 13,
-    tabBlur: 0
+    tabBlur: 0,
+    sidebarWidth: 260
   },
   terminal: {
     fontSize: 13,
