@@ -131,7 +131,11 @@ export default function EditorPane() {
     }
 
     // Emmet abbreviations (Tab to expand in HTML/CSS)
-    expandAbbreviation(monaco)
+    try {
+      expandAbbreviation(monaco)
+    } catch {
+      // Emmet may not be compatible with current Monaco version
+    }
 
     // cursor history navigation: Alt+Left = back, Alt+Right = forward
     editor.addCommand(512 | 17, () => { // Alt+Left
