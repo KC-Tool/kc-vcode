@@ -325,6 +325,26 @@ export default function EditorPane() {
     if (editorRef.current && activeFile) editorRef.current.focus()
   }, [state.activeTabId])
 
+  // AI: apply full file edit from /edit command
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const newContent = (e as CustomEvent).detail
+      const editor = editorRef.current
+      const model = editor?.getModel()
+      if (!editor || !model || typeof newContent !== 'string') return
+
+      const fullRange = model.getFullModelRange()
+      editor.executeEdits('ai-edit', [{
+        range: fullRange,
+        text: newContent,
+        forceMoveMarkers: true
+      }])
+      editor.focus()
+    }
+    document.addEventListener('ai:applyEdit', handler)
+    return () => document.removeEventListener('ai:applyEdit', handler)
+  }, [state.activeTabId])
+
   // sync theme
   useEffect(() => {
     const monaco = monacoRef.current

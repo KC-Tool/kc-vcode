@@ -63,6 +63,7 @@ export interface ElectronAPI {
   llmChat: (params: { messages: Array<{ role: string; content: string }>; context?: any }) => Promise<any>
   llmChatStream: (params: { messages: Array<{ role: string; content: string }>; context?: any }) => Promise<any>
   llmComplete: (params: { prompt: string; language?: string }) => Promise<any>
+  llmEdit: (params: { instruction: string; fileContent: string; language: string; filePath: string }) => Promise<any>
   llmGetConfig: () => Promise<{ provider: string; model: string; hasApiKey: boolean } | null>
   onLlmChatChunk: (cb: (chunk: { type: string; content: string }) => void) => void
   removeAllLlmListeners: () => void
@@ -197,7 +198,9 @@ const electronAPI = {
   },
   removeAllLlmListeners: () => {
     ipcRenderer.removeAllListeners('llm:chatChunk')
-  }
+  },
+  llmEdit: (params: { instruction: string; fileContent: string; language: string; filePath: string }) =>
+    ipcRenderer.invoke('llm:edit', params),
 }
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI)

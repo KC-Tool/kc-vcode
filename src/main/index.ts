@@ -633,6 +633,28 @@ function registerIpcHandlers(): void {
     }
   })
 
+  ipcMain.handle('llm:edit', async (_, params: { instruction: string; fileContent: string; language: string; filePath: string }) => {
+    if (!llmProvider) return { error: 'LLM not configured' }
+    try {
+      const systemPrompt = `You are a code editor. The user will give you an instruction to modify code. You must output the COMPLETE modified file content, not a diff. Output ONLY the code, no explanations, no markdown, no code fences. Language: ${params.language}`
+      const messages = [
+        { role: 'system' as const, content: systemPrompt },
+        { role: 'user' as const, content: `Current file: ${params.filePath}\n\n\`\`\`${params.language}\n${params.fileContent}\n\`\`\`\n\nInstruction: ${params.instruction}\n\nOutput the complete modified file:` }
+      ]
+
+      const chunks: string[] = []
+      for await (const chunk of llmProvider.chat({ messages, maxTokens: 8192, temperature: 0.2 })) {
+        if (chunk.type === 'text') chunks.push(chunk.content)
+      }
+      let result = chunks.join('')
+      // strip markdown code fences if present
+      result = result.replace(/^```\w*\n/, '').replace(/\n```$/, '')
+      return { content: result.trim() }
+    } catch (err: unknown) {
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
   ipcMain.handle('llm:getConfig', () => {
     if (!llmConfig) return null
     return { provider: llmConfig.provider, model: llmConfig.model, hasApiKey: !!llmConfig.apiKey }

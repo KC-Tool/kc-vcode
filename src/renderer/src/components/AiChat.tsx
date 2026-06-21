@@ -62,6 +62,45 @@ export default function AiChat() {
     setInput('')
     setLoading(true)
 
+    // handle /edit command
+    if (text.startsWith('/edit ')) {
+      const instruction = text.slice(6)
+      if (!activeFile) {
+        const assistantMsg: ChatMessage = { role: 'assistant', content: 'No file is currently open. Open a file first to use /edit.' }
+        setMessages(prev => [...prev, assistantMsg])
+        setLoading(false)
+        return
+      }
+
+      const assistantMsg: ChatMessage = { role: 'assistant', content: 'Editing file...' }
+      setMessages(prev => [...prev, assistantMsg])
+
+      const result = await window.electronAPI.llmEdit({
+        instruction,
+        fileContent: activeFile.content,
+        language: activeFile.language,
+        filePath: activeFile.path
+      })
+
+      if ('error' in result && result.error) {
+        setMessages(prev => {
+          const updated = [...prev]
+          updated[updated.length - 1] = { role: 'assistant', content: `Error: ${result.error}` }
+          return updated
+        })
+      } else if (result.content) {
+        // dispatch event to apply edit to editor
+        document.dispatchEvent(new CustomEvent('ai:applyEdit', { detail: result.content }))
+        setMessages(prev => {
+          const updated = [...prev]
+          updated[updated.length - 1] = { role: 'assistant', content: `Applied edit to \`${activeFile.path.split(/[/\\]/).pop()}\`. The file has been updated.` }
+          return updated
+        })
+      }
+      setLoading(false)
+      return
+    }
+
     // build context-aware system prompt
     const systemPrompt = `You are an AI coding assistant inside a code editor called kc-vcode. You help with coding questions, writing code, debugging, and explaining code. Be concise and practical. When showing code, use fenced code blocks with the appropriate language tag.`
 
