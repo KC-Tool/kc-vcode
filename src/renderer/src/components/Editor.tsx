@@ -170,6 +170,58 @@ export default function EditorPane() {
       }
     })
 
+    // AI Inline Completion (Ghost Text)
+    let completionTimer: ReturnType<typeof setTimeout> | null = null
+    let abortController: AbortController | null = null
+    const language = activeFile?.language || 'plaintext'
+
+    monaco.languages.registerInlineCompletionsProvider('*', {
+      provideInlineCompletions: async (model, position, context, token) => {
+        // debounce: wait 400ms after last keystroke
+        if (completionTimer) clearTimeout(completionTimer)
+
+        // abort any in-flight request
+        if (abortController) abortController.abort()
+        abortController = new AbortController()
+
+        const prompt = model.getValueInRange({
+          startLineNumber: Math.max(1, position.lineNumber - 30),
+          startColumn: 1,
+          endLineNumber: position.lineNumber,
+          endColumn: position.column
+        })
+
+        if (!prompt.trim()) return { items: [] }
+
+        try {
+          const result = await window.electronAPI.llmComplete({
+            prompt: `Complete the code at the cursor position. Output ONLY the completion text, no explanations, no markdown, no code fences.\n\nLanguage: ${language}\n\nCode context:\n${prompt}\n\nComplete from cursor:`,
+            language
+          })
+
+          if ('error' in result || !result.completion) return { items: [] }
+
+          const completion = result.completion.replace(/^\n+/, '')
+          if (!completion) return { items: [] }
+
+          return {
+            items: [{
+              insertText: completion,
+              range: {
+                startLineNumber: position.lineNumber,
+                startColumn: position.column,
+                endLineNumber: position.lineNumber,
+                endColumn: position.column
+              }
+            }]
+          }
+        } catch {
+          return { items: [] }
+        }
+      },
+      freeInlineCompletions: () => {}
+    })
+
     editor.focus()
   }, [activeFile, handleSave, setCursor, setMarkers])
 
