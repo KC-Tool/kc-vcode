@@ -72,6 +72,22 @@ export interface ElectronAPI {
   lspReferences: (params: { filePath: string; content: string; line: number; column: number }) => Promise<any>
   lspCodeActions: (params: { filePath: string; content: string; line: number; column: number }) => Promise<any>
   lspDiagnostics: (params: { filePath: string; content: string }) => Promise<any>
+  debugStart: (params: { filePath: string; cwd: string }) => Promise<any>
+  debugStop: () => Promise<any>
+  debugContinue: () => Promise<any>
+  debugPause: () => Promise<any>
+  debugNext: () => Promise<any>
+  debugStepIn: () => Promise<any>
+  debugStepOut: () => Promise<any>
+  debugSetBreakpoints: (params: { file: string; lines: number[] }) => Promise<any>
+  debugStackTrace: () => Promise<any>
+  debugScopes: (params: { frameId: number }) => Promise<any>
+  debugVariables: (params: { variablesReference: number }) => Promise<any>
+  debugEvaluate: (params: { expression: string; frameId?: number }) => Promise<any>
+  onDebugStopped: (cb: (body: any) => void) => void
+  onDebugTerminated: (cb: () => void) => void
+  onDebugExited: (cb: (body: any) => void) => void
+  removeAllDebugListeners: () => void
 }
 
 declare global {
@@ -218,6 +234,46 @@ const electronAPI = {
     ipcRenderer.invoke('lsp:codeActions', params),
   lspDiagnostics: (params: { filePath: string; content: string }) =>
     ipcRenderer.invoke('lsp:diagnostics', params),
+
+  // Debug
+  debugStart: (params: { filePath: string; cwd: string }) =>
+    ipcRenderer.invoke('debug:start', params),
+  debugStop: () =>
+    ipcRenderer.invoke('debug:stop'),
+  debugContinue: () =>
+    ipcRenderer.invoke('debug:continue'),
+  debugPause: () =>
+    ipcRenderer.invoke('debug:pause'),
+  debugNext: () =>
+    ipcRenderer.invoke('debug:next'),
+  debugStepIn: () =>
+    ipcRenderer.invoke('debug:stepIn'),
+  debugStepOut: () =>
+    ipcRenderer.invoke('debug:stepOut'),
+  debugSetBreakpoints: (params: { file: string; lines: number[] }) =>
+    ipcRenderer.invoke('debug:setBreakpoints', params),
+  debugStackTrace: () =>
+    ipcRenderer.invoke('debug:stackTrace'),
+  debugScopes: (params: { frameId: number }) =>
+    ipcRenderer.invoke('debug:scopes', params),
+  debugVariables: (params: { variablesReference: number }) =>
+    ipcRenderer.invoke('debug:variables', params),
+  debugEvaluate: (params: { expression: string; frameId?: number }) =>
+    ipcRenderer.invoke('debug:evaluate', params),
+  onDebugStopped: (cb: (body: any) => void) => {
+    ipcRenderer.on('debug:stopped', (_, body) => cb(body))
+  },
+  onDebugTerminated: (cb: () => void) => {
+    ipcRenderer.on('debug:terminated', () => cb())
+  },
+  onDebugExited: (cb: (body: any) => void) => {
+    ipcRenderer.on('debug:exited', (_, body) => cb(body))
+  },
+  removeAllDebugListeners: () => {
+    ipcRenderer.removeAllListeners('debug:stopped')
+    ipcRenderer.removeAllListeners('debug:terminated')
+    ipcRenderer.removeAllListeners('debug:exited')
+  },
 }
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI)
