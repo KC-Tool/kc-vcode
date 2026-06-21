@@ -67,6 +67,11 @@ export interface ElectronAPI {
   llmGetConfig: () => Promise<{ provider: string; model: string; hasApiKey: boolean } | null>
   onLlmChatChunk: (cb: (chunk: { type: string; content: string }) => void) => void
   removeAllLlmListeners: () => void
+  lspHover: (params: { filePath: string; content: string; line: number; column: number }) => Promise<any>
+  lspDefinition: (params: { filePath: string; content: string; line: number; column: number }) => Promise<any>
+  lspReferences: (params: { filePath: string; content: string; line: number; column: number }) => Promise<any>
+  lspCodeActions: (params: { filePath: string; content: string; line: number; column: number }) => Promise<any>
+  lspDiagnostics: (params: { filePath: string; content: string }) => Promise<any>
 }
 
 declare global {
@@ -201,6 +206,18 @@ const electronAPI = {
   },
   llmEdit: (params: { instruction: string; fileContent: string; language: string; filePath: string }) =>
     ipcRenderer.invoke('llm:edit', params),
+
+  // LSP
+  lspHover: (params: { filePath: string; content: string; line: number; column: number }) =>
+    ipcRenderer.invoke('lsp:hover', params),
+  lspDefinition: (params: { filePath: string; content: string; line: number; column: number }) =>
+    ipcRenderer.invoke('lsp:definition', params),
+  lspReferences: (params: { filePath: string; content: string; line: number; column: number }) =>
+    ipcRenderer.invoke('lsp:references', params),
+  lspCodeActions: (params: { filePath: string; content: string; line: number; column: number }) =>
+    ipcRenderer.invoke('lsp:codeActions', params),
+  lspDiagnostics: (params: { filePath: string; content: string }) =>
+    ipcRenderer.invoke('lsp:diagnostics', params),
 }
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI)

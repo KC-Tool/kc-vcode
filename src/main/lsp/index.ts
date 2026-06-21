@@ -1,0 +1,1 @@
+export { getHover, getDefinition, getReferences, getCodeActions, getDiagnostics } from './typescript'

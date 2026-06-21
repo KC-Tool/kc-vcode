@@ -110,6 +110,25 @@ export default function EditorPane() {
     // Ctrl+S save
     editor.addCommand(2048 | 49, () => handleSave())
 
+    // LSP Hover provider for TypeScript/JavaScript
+    if (language === 'typescript' || language === 'javascript' || language === 'typescriptreact' || language === 'javascriptreact') {
+      monaco.languages.registerHoverProvider(language, {
+        provideHover: async (model, position) => {
+          const filePath = activeFile?.path
+          if (!filePath) return null
+          const content = model.getValue()
+          const result = await window.electronAPI.lspHover({
+            filePath, content, line: position.lineNumber, column: position.column
+          })
+          if (!result) return null
+          return {
+            range: new monaco.Range(position.lineNumber, position.column, position.lineNumber, position.column),
+            contents: [{ value: `**${result.kind}**\n\n${result.text}` }]
+          }
+        }
+      })
+    }
+
     // Emmet abbreviations (Tab to expand in HTML/CSS)
     expandAbbreviation(monaco)
 

@@ -5,6 +5,7 @@ import os from 'node:os'
 import { startWatching, stopWatching } from './watcher'
 import * as git from './git'
 import { createPty, writeToPty, resizePty, destroyPty } from './terminal'
+import * as lsp from './lsp'
 import { createCloudProvider, buildContextForChat, buildContextForCompletion, summarizeTree, LLMProvider, LLMConfig } from './llm'
 
 let mainWin: BrowserWindow | null = null
@@ -658,6 +659,27 @@ function registerIpcHandlers(): void {
   ipcMain.handle('llm:getConfig', () => {
     if (!llmConfig) return null
     return { provider: llmConfig.provider, model: llmConfig.model, hasApiKey: !!llmConfig.apiKey }
+  })
+
+  // LSP: TypeScript Language Service
+  ipcMain.handle('lsp:hover', (_, params: { filePath: string; content: string; line: number; column: number }) => {
+    return lsp.getHover(params.filePath, params.content, params.line, params.column)
+  })
+
+  ipcMain.handle('lsp:definition', (_, params: { filePath: string; content: string; line: number; column: number }) => {
+    return lsp.getDefinition(params.filePath, params.content, params.line, params.column)
+  })
+
+  ipcMain.handle('lsp:references', (_, params: { filePath: string; content: string; line: number; column: number }) => {
+    return lsp.getReferences(params.filePath, params.content, params.line, params.column)
+  })
+
+  ipcMain.handle('lsp:codeActions', (_, params: { filePath: string; content: string; line: number; column: number }) => {
+    return lsp.getCodeActions(params.filePath, params.content, params.line, params.column)
+  })
+
+  ipcMain.handle('lsp:diagnostics', (_, params: { filePath: string; content: string }) => {
+    return lsp.getDiagnostics(params.filePath, params.content)
   })
 }
 
