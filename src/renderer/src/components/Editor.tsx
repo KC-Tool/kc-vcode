@@ -65,6 +65,7 @@ export default function EditorPane() {
   const handleEditorMount: OnMount = useCallback((editor, monaco) => {
     editorRef.current = editor
     monacoRef.current = monaco
+    const language = activeFile?.language || 'plaintext'
 
     // track cursor position changes for history
     let lastPos: CursorPosition | null = null
@@ -196,7 +197,6 @@ export default function EditorPane() {
     // AI Inline Completion (Ghost Text)
     let completionTimer: ReturnType<typeof setTimeout> | null = null
     let abortController: AbortController | null = null
-    const language = activeFile?.language || 'plaintext'
 
     monaco.languages.registerInlineCompletionsProvider('*', {
       provideInlineCompletions: async (model, position, context, token) => {
