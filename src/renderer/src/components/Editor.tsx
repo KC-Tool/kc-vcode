@@ -300,6 +300,25 @@ export default function EditorPane() {
     return () => document.removeEventListener('editor:goToLine', handler)
   }, [state.activeTabId])
 
+  // AI: insert code from chat
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const code = (e as CustomEvent).detail
+      const editor = editorRef.current
+      if (!editor || typeof code !== 'string') return
+      const pos = editor.getPosition()
+      if (!pos) return
+      editor.executeEdits('ai-insert', [{
+        range: { startLineNumber: pos.lineNumber, startColumn: pos.column, endLineNumber: pos.lineNumber, endColumn: pos.column },
+        text: code,
+        forceMoveMarkers: true
+      }])
+      editor.focus()
+    }
+    document.addEventListener('ai:insertCode', handler)
+    return () => document.removeEventListener('ai:insertCode', handler)
+  }, [state.activeTabId])
+
   // settings tab
   const isSettings = state.tabs.find(t => t.id === state.activeTabId)?.isSettings
   if (isSettings) {

@@ -59,6 +59,13 @@ export interface ElectronAPI {
   gitCreateBranch: (cwd: string, name: string) => Promise<string>
   gitDiffStat: (cwd: string) => Promise<any[]>
   gitBlame: (cwd: string, filePath: string) => Promise<any[]>
+  llmConfigure: (config: { provider: string; apiKey: string; model: string; baseUrl?: string }) => Promise<void>
+  llmChat: (params: { messages: Array<{ role: string; content: string }>; context?: any }) => Promise<any>
+  llmChatStream: (params: { messages: Array<{ role: string; content: string }>; context?: any }) => Promise<any>
+  llmComplete: (params: { prompt: string; language?: string }) => Promise<any>
+  llmGetConfig: () => Promise<{ provider: string; model: string; hasApiKey: boolean } | null>
+  onLlmChatChunk: (cb: (chunk: { type: string; content: string }) => void) => void
+  removeAllLlmListeners: () => void
 }
 
 declare global {
@@ -172,7 +179,25 @@ const electronAPI = {
   gitCheckout: (cwd: string, branch: string) => ipcRenderer.invoke('git:checkout', cwd, branch),
   gitCreateBranch: (cwd: string, name: string) => ipcRenderer.invoke('git:createBranch', cwd, name),
   gitDiffStat: (cwd: string) => ipcRenderer.invoke('git:diffStat', cwd),
-  gitBlame: (cwd: string, filePath: string) => ipcRenderer.invoke('git:blame', cwd, filePath)
+  gitBlame: (cwd: string, filePath: string) => ipcRenderer.invoke('git:blame', cwd, filePath),
+
+  // LLM
+  llmConfigure: (config: { provider: string; apiKey: string; model: string; baseUrl?: string }) =>
+    ipcRenderer.invoke('llm:configure', config),
+  llmChat: (params: { messages: Array<{ role: string; content: string }>; context?: any }) =>
+    ipcRenderer.invoke('llm:chat', params),
+  llmChatStream: (params: { messages: Array<{ role: string; content: string }>; context?: any }) =>
+    ipcRenderer.invoke('llm:chatStream', params),
+  llmComplete: (params: { prompt: string; language?: string }) =>
+    ipcRenderer.invoke('llm:complete', params),
+  llmGetConfig: () =>
+    ipcRenderer.invoke('llm:getConfig'),
+  onLlmChatChunk: (cb: (chunk: { type: string; content: string }) => void) => {
+    ipcRenderer.on('llm:chatChunk', (_, chunk) => cb(chunk))
+  },
+  removeAllLlmListeners: () => {
+    ipcRenderer.removeAllListeners('llm:chatChunk')
+  }
 }
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI)

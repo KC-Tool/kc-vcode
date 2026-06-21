@@ -1,12 +1,13 @@
 import React, { useState } from 'react'
 import { useSettings } from '../contexts/SettingsContext'
 
-const categories = ['editor', 'appearance', 'terminal', 'files'] as const
+const categories = ['editor', 'appearance', 'terminal', 'files', 'ai'] as const
 const catLabels: Record<string, string> = {
   editor: 'Editor',
   appearance: 'Appearance',
   terminal: 'Terminal',
-  files: 'Files'
+  files: 'Files',
+  ai: 'AI'
 }
 
 export default function SettingsView() {
@@ -139,6 +140,9 @@ export default function SettingsView() {
             </SettingRow>
           </>
         )}
+        {activeCat === 'ai' && (
+          <AiSettingsPanel />
+        )}
       </div>
     </div>
   )
@@ -161,5 +165,68 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
     <div className={`settings-toggle${checked ? ' settings-toggle--on' : ''}`} onClick={() => onChange(!checked)}>
       <div className="settings-toggle-thumb" />
     </div>
+  )
+}
+
+function AiSettingsPanel() {
+  const [provider, setProvider] = React.useState('openai')
+  const [apiKey, setApiKey] = React.useState('')
+  const [model, setModel] = React.useState('gpt-4o')
+  const [baseUrl, setBaseUrl] = React.useState('')
+  const [saved, setSaved] = React.useState(false)
+
+  React.useEffect(() => {
+    window.electronAPI.llmGetConfig().then(cfg => {
+      if (cfg) {
+        setProvider(cfg.provider || 'openai')
+        setModel(cfg.model || 'gpt-4o')
+      }
+    })
+  }, [])
+
+  const handleSave = async () => {
+    await window.electronAPI.llmConfigure({ provider, apiKey, model, baseUrl: baseUrl || undefined })
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+  }
+
+  const models: Record<string, string[]> = {
+    openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'],
+    anthropic: ['claude-sonnet-4-20250514', 'claude-3-5-sonnet-20241022', 'claude-3-haiku-20240307']
+  }
+
+  return (
+    <>
+      <SettingRow label="Provider" desc="LLM provider for AI features">
+        <select className="settings-select" value={provider} onChange={e => {
+          setProvider(e.target.value)
+          setModel(models[e.target.value]?.[0] || '')
+        }}>
+          <option value="openai">OpenAI</option>
+          <option value="anthropic">Anthropic</option>
+        </select>
+      </SettingRow>
+      <SettingRow label="API Key" desc="Your API key (stored locally)">
+        <input type="password" className="settings-input" style={{ width: 280 }}
+          value={apiKey} onChange={e => setApiKey(e.target.value)}
+          placeholder="sk-..." />
+      </SettingRow>
+      <SettingRow label="Model" desc="Model to use for chat and completion">
+        <select className="settings-select" value={model} onChange={e => setModel(e.target.value)}>
+          {(models[provider] || []).map(m => <option key={m} value={m}>{m}</option>)}
+        </select>
+      </SettingRow>
+      <SettingRow label="Base URL" desc="Custom API endpoint (optional)">
+        <input type="text" className="settings-input" style={{ width: 280 }}
+          value={baseUrl} onChange={e => setBaseUrl(e.target.value)}
+          placeholder="https://api.openai.com/v1" />
+      </SettingRow>
+      <div style={{ padding: '12px 0', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <button className="sidebar-empty-btn" onClick={handleSave}>
+          {saved ? 'Saved!' : 'Save & Configure'}
+        </button>
+        {saved && <span style={{ fontSize: 12, color: 'var(--fg-accent)' }}>Configuration applied</span>}
+      </div>
+    </>
   )
 }

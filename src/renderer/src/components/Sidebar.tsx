@@ -3,6 +3,7 @@ import FileTree from './FileTree'
 import SearchPanel from './SearchPanel'
 import SourceControl from './SourceControl'
 import ProblemsPanel from './ProblemsPanel'
+import AiChat from './AiChat'
 import ActivityBar, { ActivityView } from './ActivityBar'
 import { FileNode } from '../../../preload/index'
 import { useEditorContext } from '../contexts/EditorContext'
@@ -122,6 +123,9 @@ export default function Sidebar({ tree, onOpenFolder, onRefresh, onOpenSettings,
         )}
         {view === 'problems' && (
           <ProblemsPanel />
+        )}
+        {view === 'ai-chat' && (
+          <AiChat />
         )}
       </div>
     </div>

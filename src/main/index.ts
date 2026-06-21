@@ -5,6 +5,7 @@ import os from 'node:os'
 import { startWatching, stopWatching } from './watcher'
 import * as git from './git'
 import { createPty, writeToPty, resizePty, destroyPty } from './terminal'
+import { createCloudProvider, buildContextForChat, buildContextForCompletion, summarizeTree, LLMProvider, LLMConfig } from './llm'
 
 let mainWin: BrowserWindow | null = null
 let currentDir: string | null = null
@@ -571,6 +572,71 @@ function registerIpcHandlers(): void {
   ipcMain.handle('git:createBranch', (_, cwd: string, name: string) => git.createBranch(cwd, name))
   ipcMain.handle('git:diffStat', (_, cwd: string) => git.getDiffStat(cwd))
   ipcMain.handle('git:blame', (_, cwd: string, filePath: string) => git.getBlame(cwd, filePath))
+
+  // LLM
+  let llmProvider: LLMProvider | null = null
+  let llmConfig: LLMConfig | null = null
+
+  ipcMain.handle('llm:configure', (_, config: LLMConfig) => {
+    llmConfig = config
+    llmProvider = createCloudProvider(config)
+    return { success: true }
+  })
+
+  ipcMain.handle('llm:chat', async (_, params: { messages: Array<{ role: string; content: string }>; context?: any }) => {
+    if (!llmProvider) return { error: 'LLM not configured. Please set API key in Settings.' }
+    const chatParams = {
+      messages: params.messages,
+      systemPrompt: 'You are an expert coding assistant. You help with writing, understanding, and debugging code. Be concise and precise. Format code blocks with language tags.',
+      temperature: 0.7,
+      maxTokens: 4096
+    }
+    try {
+      const chunks: string[] = []
+      for await (const chunk of llmProvider.chat(chatParams)) {
+        if (chunk.type === 'text') chunks.push(chunk.content)
+      }
+      return { content: chunks.join('') }
+    } catch (err: unknown) {
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  ipcMain.handle('llm:chatStream', async (event, params: { messages: Array<{ role: string; content: string }>; context?: any }) => {
+    if (!llmProvider) return { error: 'LLM not configured. Please set API key in Settings.' }
+    const chatParams = {
+      messages: params.messages,
+      systemPrompt: 'You are an expert coding assistant. You help with writing, understanding, and debugging code. Be concise and precise. Format code blocks with language tags.',
+      temperature: 0.7,
+      maxTokens: 4096
+    }
+    try {
+      for await (const chunk of llmProvider.chat(chatParams)) {
+        event.sender.send('llm:chatChunk', chunk)
+      }
+      return { success: true }
+    } catch (err: unknown) {
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  ipcMain.handle('llm:complete', async (_, params: { prompt: string; language?: string }) => {
+    if (!llmProvider) return { error: 'LLM not configured' }
+    try {
+      const chunks: string[] = []
+      for await (const chunk of llmProvider.complete({ prompt: params.prompt, language: params.language })) {
+        chunks.push(chunk)
+      }
+      return { completion: chunks.join('') }
+    } catch (err: unknown) {
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  ipcMain.handle('llm:getConfig', () => {
+    if (!llmConfig) return null
+    return { provider: llmConfig.provider, model: llmConfig.model, hasApiKey: !!llmConfig.apiKey }
+  })
 }
 
 app.whenReady().then(() => {
