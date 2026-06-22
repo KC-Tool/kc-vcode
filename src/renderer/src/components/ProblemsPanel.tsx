@@ -6,7 +6,7 @@ const SEV_CLASS: Record<string, string> = { error: 'pm-error', warning: 'pm-warn
 
 export default function ProblemsPanel() {
   const { state, setActiveTab } = useEditorContext()
-  const markers = state.markers
+  const markers = state.markers || []
   const errCount = markers.filter(m => m.severity === 'error').length
   const warnCount = markers.filter(m => m.severity === 'warning').length
 
