@@ -4,9 +4,9 @@ import { useEditorContext } from '../contexts/EditorContext'
 const SEV_ICON: Record<string, string> = { error: '✕', warning: '▲', info: '●', hint: '○' }
 const SEV_CLASS: Record<string, string> = { error: 'pm-error', warning: 'pm-warn', info: 'pm-info', hint: 'pm-hint' }
 
-export default function ProblemsPanel() {
+function ProblemsPanelInner() {
   const { state, setActiveTab } = useEditorContext()
-  const markers = state.markers || []
+  const markers = state?.markers ?? []
   const errCount = markers.filter(m => m.severity === 'error').length
   const warnCount = markers.filter(m => m.severity === 'warning').length
 
@@ -51,5 +51,27 @@ export default function ProblemsPanel() {
         ))}
       </div>
     </div>
+  )
+}
+
+class ProblemsErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false }
+  static getDerivedStateFromError() { return { hasError: true } }
+  render() {
+    if (this.state.hasError) {
+      return <div className="pm-empty">Failed to load problems.</div>
+    }
+    return this.props.children
+  }
+}
+
+export default function ProblemsPanel() {
+  return (
+    <ProblemsErrorBoundary>
+      <ProblemsPanelInner />
+    </ProblemsErrorBoundary>
   )
 }
