@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback, useState } from 'react'
+import React, { useRef, useEffect, useState } from 'react'
 import { Terminal as XTerm } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
@@ -6,7 +6,6 @@ import '@xterm/xterm/css/xterm.css'
 interface TermTab {
   id: number
   label: string
-  cwd?: string
 }
 
 interface TerminalProps {
@@ -37,20 +36,20 @@ export default function TerminalPanel({ cwd, visible, theme }: TerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<XTerm | null>(null)
   const fitRef = useRef<FitAddon | null>(null)
-  const [tabs, setTabs] = useState<TermTab[]>([{ id: 0, label: 'Terminal 1', cwd }])
+  const [tabs, setTabs] = useState<TermTab[]>([{ id: 0, label: 'Terminal 1' }])
   const [activeTabId, setActiveTabId] = useState(0)
   const nextIdRef = useRef(1)
-  const termsMap = useRef<Map<number, { term: XTerm; fit: FitAddon }>>(new Map())
 
-  const teardown = useCallback(() => {
-    termsMap.current.forEach(({ term }) => term.dispose())
-    termsMap.current.clear()
-    termRef.current = null
-    fitRef.current = null
-  }, [])
+  useEffect(() => {
+    if (!visible || !containerRef.current) {
+      if (!visible) {
+        termRef.current?.dispose()
+        termRef.current = null
+        fitRef.current = null
+      }
+      return
+    }
 
-  const createTerminal = useCallback((tabCwd?: string) => {
-    if (!containerRef.current) return
     const term = new XTerm({
       fontFamily: "'Cascadia Code', 'Fira Code', 'Consolas', monospace",
       fontSize: 13,
@@ -58,6 +57,7 @@ export default function TerminalPanel({ cwd, visible, theme }: TerminalProps) {
       cursorBlink: true,
       scrollback: 3000
     })
+
     const fitAddon = new FitAddon()
     term.loadAddon(fitAddon)
     term.open(containerRef.current)
@@ -69,7 +69,7 @@ export default function TerminalPanel({ cwd, visible, theme }: TerminalProps) {
 
     term.onData(onDataHandler)
     window.electronAPI.onTerminalData(onTermDataHandler)
-    window.electronAPI.createTerminal(tabCwd || cwd)
+    window.electronAPI.createTerminal(cwd)
 
     setTimeout(() => { fitAddon.fit(); term.focus() }, 300)
 
@@ -79,24 +79,12 @@ export default function TerminalPanel({ cwd, visible, theme }: TerminalProps) {
     }
     window.addEventListener('resize', onResize)
 
-    return { term, fit: fitAddon, onResize, onTermDataHandler }
-  }, [cwd, theme])
-
-  useEffect(() => {
-    if (!visible || !containerRef.current) {
-      if (!visible) teardown()
-      return
-    }
-
-    const result = createTerminal()
-    if (!result) return
-
-    const { onResize, onTermDataHandler } = result
-
     return () => {
       window.removeEventListener('resize', onResize)
       window.electronAPI.removeAllListeners('terminal:data')
-      teardown()
+      term.dispose()
+      termRef.current = null
+      fitRef.current = null
     }
   }, [visible, cwd])
 
@@ -108,9 +96,14 @@ export default function TerminalPanel({ cwd, visible, theme }: TerminalProps) {
 
   const handleAddTab = () => {
     const id = nextIdRef.current++
-    const newTab: TermTab = { id, label: `Terminal ${id + 1}`, cwd }
-    setTabs(prev => [...prev, newTab])
+    setTabs(prev => [...prev, { id, label: `Terminal ${id + 1}` }])
     setActiveTabId(id)
+    // create a new pty for the new tab
+    window.electronAPI.createTerminal(cwd)
+    setTimeout(() => {
+      if (fitRef.current) fitRef.current.fit()
+      termRef.current?.focus()
+    }, 100)
   }
 
   const handleCloseTab = (tabId: number) => {
@@ -119,8 +112,7 @@ export default function TerminalPanel({ cwd, visible, theme }: TerminalProps) {
     const newTabs = tabs.filter(t => t.id !== tabId)
     setTabs(newTabs)
     if (activeTabId === tabId) {
-      const newActive = newTabs[Math.min(idx, newTabs.length - 1)]
-      setActiveTabId(newActive.id)
+      setActiveTabId(newTabs[Math.min(idx, newTabs.length - 1)].id)
     }
   }
 
