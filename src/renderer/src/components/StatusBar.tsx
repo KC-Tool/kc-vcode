@@ -3,9 +3,10 @@ import { useEditorContext } from '../contexts/EditorContext'
 
 interface StatusBarProps {
   onToggleTerminal: () => void
+  onOpenShortcuts?: () => void
 }
 
-export default function StatusBar({ onToggleTerminal }: StatusBarProps) {
+export default function StatusBar({ onToggleTerminal, onOpenShortcuts }: StatusBarProps) {
   const { state, setTheme } = useEditorContext()
   const activeFile = state.activeTabId ? state.files[state.activeTabId] : null
 
@@ -47,6 +48,14 @@ export default function StatusBar({ onToggleTerminal }: StatusBarProps) {
         <span className="status-separator" />
         <span className="status-item clickable" onClick={onToggleTerminal} title="Toggle Terminal (Ctrl+`)">
           Terminal
+        </span>
+        <span className="status-separator" />
+        <span className="status-item clickable" onClick={onOpenShortcuts} title="Keyboard Shortcuts (Ctrl+Shift+K)">
+          ⌨
+        </span>
+        <span className="status-separator" />
+        <span className="status-item">
+          {Math.round(state.zoomLevel * 100)}%
         </span>
         <span className="status-separator" />
         <span className="status-item">kc-vcode</span>

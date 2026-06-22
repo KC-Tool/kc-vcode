@@ -277,7 +277,7 @@ function AppContent() {
           <BottomPanel cwd={dirPathRef.current || undefined} visible={termVisible} theme={state.theme} onClose={() => setTermVisible(false)} onOpenFile={async (filePath) => { const res = await window.electronAPI.openFile(filePath); if ('error' in res) return; openFile(filePath, filePath.split(/[/\\]/).pop() || '', res.content, res.language) }} />
         </div>
       </div>
-      <StatusBar onToggleTerminal={() => setTermVisible(v => !v)} />
+      <StatusBar onToggleTerminal={() => setTermVisible(v => !v)} onOpenShortcuts={() => setKbdVisible(true)} />
       <CommandPalette
         visible={paletteVisible}
         mode={paletteMode}
