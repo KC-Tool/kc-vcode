@@ -553,6 +553,16 @@ function registerIpcHandlers(): void {
     }
   })
 
+  ipcMain.handle('file:move', async (_, data: { sourcePath: string; targetPath: string }) => {
+    try {
+      if (fs.existsSync(data.targetPath)) return { error: 'Target already exists' }
+      fs.renameSync(data.sourcePath, data.targetPath)
+      return { success: true }
+    } catch (err: unknown) {
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
   ipcMain.handle('clipboard:writeText', (_, text: string) => {
     clipboard.writeText(text)
   })

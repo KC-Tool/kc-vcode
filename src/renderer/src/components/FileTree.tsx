@@ -62,6 +62,7 @@ function FileTreeItem({ node, onFileClick, directoryPath, depth = 0, onContextMe
   onRenameCancel: () => void
 }) {
   const [expanded, setExpanded] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
   const isDir = node.type === 'directory'
 
   const handleClick = useCallback(() => {
@@ -75,13 +76,50 @@ function FileTreeItem({ node, onFileClick, directoryPath, depth = 0, onContextMe
     onContextMenu(e, node)
   }, [node, onContextMenu])
 
+  const handleDragStart = useCallback((e: React.DragEvent) => {
+    e.dataTransfer.setData('text/plain', node.path)
+    e.dataTransfer.effectAllowed = 'move'
+  }, [node.path])
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    if (!isDir) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDragOver(true)
+  }, [isDir])
+
+  const handleDragLeave = useCallback(() => {
+    setDragOver(false)
+  }, [])
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragOver(false)
+    if (!isDir) return
+    const sourcePath = e.dataTransfer.getData('text/plain')
+    if (!sourcePath || sourcePath === node.path) return
+    const fileName = sourcePath.replace(/\\/g, '/').split('/').pop()
+    if (!fileName) return
+    const newPath = node.path.replace(/\\/g, '/') + '/' + fileName
+    try {
+      await window.electronAPI.moveFile(sourcePath, newPath)
+    } catch (err) {
+      console.error('Move failed:', err)
+    }
+  }, [isDir, node.path])
+
   return (
     <div>
       <div
-        className="file-tree-item"
+        className={`file-tree-item${dragOver ? ' file-tree-item--drag-over' : ''}`}
         style={{ paddingLeft: `${8 + depth * 16}px` }}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
+        draggable
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
         title={node.path}
       >
         {isDir ? (

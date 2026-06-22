@@ -42,6 +42,7 @@ export interface ElectronAPI {
   openExternal: (url: string) => Promise<void>
   deleteFile: (filePath: string) => Promise<{ success?: boolean; error?: string }>
   renameFile: (oldPath: string, newName: string) => Promise<{ success?: boolean; newPath?: string; error?: string }>
+  moveFile: (sourcePath: string, targetPath: string) => Promise<{ success?: boolean; error?: string }>
   clipboardWriteText: (text: string) => Promise<void>
   gitStatus: (cwd: string) => Promise<any>
   gitDiff: (cwd: string, filePath?: string) => Promise<string>
@@ -182,6 +183,9 @@ const electronAPI = {
 
   renameFile: (oldPath: string, newName: string): Promise<{ success?: boolean; newPath?: string; error?: string }> =>
     ipcRenderer.invoke('file:rename', { oldPath, newName }),
+
+  moveFile: (sourcePath: string, targetPath: string): Promise<{ success?: boolean; error?: string }> =>
+    ipcRenderer.invoke('file:move', { sourcePath, targetPath }),
 
   clipboardWriteText: (text: string): Promise<void> =>
     ipcRenderer.invoke('clipboard:writeText', text),
