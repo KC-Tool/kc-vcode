@@ -4,9 +4,10 @@ import logoSvg from '../assets/icon.svg'
 
 interface WelcomePageProps {
   onOpenFolder: () => void
+  onOpenShortcuts?: () => void
 }
 
-export default function WelcomePage({ onOpenFolder }: WelcomePageProps) {
+export default function WelcomePage({ onOpenFolder, onOpenShortcuts }: WelcomePageProps) {
   const { openFile } = useEditorContext()
 
   const handleOpenFile = async () => {
@@ -49,6 +50,18 @@ export default function WelcomePage({ onOpenFolder }: WelcomePageProps) {
           <span className="shortcut-key">Ctrl</span>
           <span className="shortcut-key">S</span>
           <span className="shortcut-label">Save</span>
+        </div>
+        <div className="shortcut-row">
+          <span className="shortcut-key">Ctrl</span>
+          <span className="shortcut-key">Shift</span>
+          <span className="shortcut-key">P</span>
+          <span className="shortcut-label">Command Palette</span>
+        </div>
+        <div className="shortcut-row">
+          <span className="shortcut-key">Ctrl</span>
+          <span className="shortcut-key">Shift</span>
+          <span className="shortcut-key">K</span>
+          <span className="shortcut-label">All Shortcuts</span>
         </div>
       </div>
     </div>
