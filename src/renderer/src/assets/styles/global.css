@@ -2808,6 +2808,13 @@ body {
 
 /* ── bottom panel slide animation ── */
 .bp-panel {
+  display: flex;
+  flex-direction: column;
+  height: 220px;
+  flex-shrink: 0;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  overflow: hidden;
   animation: bp-slide-up 300ms var(--ease-spring);
 }
 
