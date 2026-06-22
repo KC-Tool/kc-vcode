@@ -11,13 +11,16 @@ interface ContextMenu {
 }
 
 export default function TabBar() {
-  const { state, setActiveTab, closeTab, closeAllTabs } = useEditorContext()
+  const { state, setActiveTab, closeTab, closeAllTabs, reorderTabs } = useEditorContext()
   const { confirm } = useConfirm()
   const { settings } = useSettings()
   const prevTabCount = useRef(state.tabs.length)
   const [entering, setEntering] = useState<string | null>(null)
   const [closing, setClosing] = useState<string | null>(null)
   const [ctx, setCtx] = useState<ContextMenu | null>(null)
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
+  const [dragSide, setDragSide] = useState<'left' | 'right'>('right')
   const blur = settings.appearance.tabBlur
 
   useEffect(() => {
@@ -92,6 +95,46 @@ export default function TabBar() {
     setCtx({ tabId, x: e.clientX, y: e.clientY })
   }
 
+  // drag-and-drop handlers
+  const handleDragStart = (e: React.DragEvent, tabId: string) => {
+    setDragId(tabId)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', tabId)
+  }
+
+  const handleDragOver = (e: React.DragEvent, tabId: string) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    if (tabId === dragId) return
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const midX = rect.left + rect.width / 2
+    setDragOverId(tabId)
+    setDragSide(e.clientX < midX ? 'left' : 'right')
+  }
+
+  const handleDrop = (e: React.DragEvent, targetTabId: string) => {
+    e.preventDefault()
+    if (!dragId || dragId === targetTabId) {
+      setDragId(null)
+      setDragOverId(null)
+      return
+    }
+    const fromIndex = state.tabs.findIndex(t => t.id === dragId)
+    let toIndex = state.tabs.findIndex(t => t.id === targetTabId)
+    if (dragSide === 'right') toIndex++
+    if (fromIndex < toIndex) toIndex--
+    if (fromIndex !== toIndex) {
+      reorderTabs(fromIndex, toIndex)
+    }
+    setDragId(null)
+    setDragOverId(null)
+  }
+
+  const handleDragEnd = () => {
+    setDragId(null)
+    setDragOverId(null)
+  }
+
   const tab = ctx ? state.tabs.find(t => t.id === ctx.tabId) : null
 
   return (
@@ -99,11 +142,16 @@ export default function TabBar() {
       <div className="tab-bar-inner">
         {state.tabs.map(tab => {
           const isActive = tab.id === state.activeTabId
+          const isDragging = tab.id === dragId
+          const isDragOver = tab.id === dragOverId
           const cls = [
             'tab-item',
             isActive ? 'tab-item--active' : 'tab-item--inactive',
             tab.id === entering && 'tab-item--enter',
-            tab.id === closing && 'tab-item--closing'
+            tab.id === closing && 'tab-item--closing',
+            isDragging && 'tab-item--dragging',
+            isDragOver && dragSide === 'left' && 'tab-item--drag-over-left',
+            isDragOver && dragSide === 'right' && 'tab-item--drag-over-right'
           ].filter(Boolean).join(' ')
 
           return (
@@ -112,6 +160,11 @@ export default function TabBar() {
               className={cls}
               onClick={() => setActiveTab(tab.id)}
               onContextMenu={(e) => handleContextMenu(e, tab.id)}
+              draggable
+              onDragStart={(e) => handleDragStart(e, tab.id)}
+              onDragOver={(e) => handleDragOver(e, tab.id)}
+              onDrop={(e) => handleDrop(e, tab.id)}
+              onDragEnd={handleDragEnd}
               title={tab.id}
               style={!isActive && blur > 0 ? { backdropFilter: `blur(${blur}px)`, WebkitBackdropFilter: `blur(${blur}px)` } : undefined}
             >
