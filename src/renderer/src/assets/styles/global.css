@@ -2638,84 +2638,6 @@ body {
   to { opacity: 1; transform: scale(1); }
 }
 
-/* ── terminal multi-tab (inline in bottom panel header) ── */
-.bp-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.bp-term-tabs {
-  display: flex;
-  align-items: center;
-  gap: 0;
-}
-
-.bp-term-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 2px 8px;
-  font-size: 11px;
-  color: var(--fg-muted);
-  cursor: pointer;
-  white-space: nowrap;
-  border-radius: var(--radius-sm);
-  transition: background var(--duration-fast) var(--ease-out),
-              color var(--duration-fast) var(--ease-out);
-}
-
-.bp-term-tab:hover {
-  background: var(--bg-hover);
-  color: var(--fg-secondary);
-}
-
-.bp-term-tab--active {
-  background: var(--bg-tertiary);
-  color: var(--fg-primary);
-}
-
-.bp-term-tab-icon {
-  font-size: 8px;
-  line-height: 1;
-}
-
-.bp-term-tab-close {
-  font-size: 14px;
-  opacity: 0;
-  margin-left: 2px;
-  transition: opacity var(--duration-fast) var(--ease-out);
-}
-
-.bp-term-tab:hover .bp-term-tab-close {
-  opacity: 0.6;
-}
-
-.bp-term-tab-close:hover {
-  opacity: 1 !important;
-}
-
-.bp-term-tab-add {
-  background: none;
-  border: none;
-  color: var(--fg-muted);
-  cursor: pointer;
-  font-size: 15px;
-  width: 22px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-sm);
-  transition: background var(--duration-fast) var(--ease-out),
-              color var(--duration-fast) var(--ease-out);
-}
-
-.bp-term-tab-add:hover {
-  background: var(--bg-hover);
-  color: var(--fg-primary);
-}
-
 /* ── git diff viewer ── */
 .git-diff-overlay {
   position: fixed;
@@ -2894,14 +2816,174 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* ── bottom panel header (VS Code style) ── */
+.bp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 35px;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.bp-tabs {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
 .bp-tab {
-  transition: background var(--duration-fast) var(--ease-out),
-              color var(--duration-fast) var(--ease-out),
-              transform var(--duration-fast) var(--ease-spring);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 12px;
+  height: 100%;
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--fg-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  border-bottom: 1px solid transparent;
+  transition: color var(--duration-fast) var(--ease-out),
+              border-color var(--duration-fast) var(--ease-out);
 }
 
 .bp-tab:hover {
-  transform: translateY(-1px);
+  color: var(--fg-secondary);
+}
+
+.bp-tab--active {
+  color: var(--fg-primary);
+  border-bottom-color: var(--fg-accent);
+}
+
+.bp-badge {
+  background: var(--fg-accent);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 0 5px;
+  border-radius: 8px;
+  min-width: 16px;
+  text-align: center;
+  line-height: 16px;
+}
+
+.bp-right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-right: 4px;
+  height: 100%;
+}
+
+/* terminal instance tabs (VS Code pill style) */
+.bp-term-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-right: 4px;
+}
+
+.bp-term-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  font-size: 11px;
+  color: var(--fg-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  border-radius: var(--radius-sm);
+  transition: background var(--duration-fast) var(--ease-out),
+              color var(--duration-fast) var(--ease-out);
+}
+
+.bp-term-tab:hover {
+  background: var(--bg-hover);
+  color: var(--fg-secondary);
+}
+
+.bp-term-tab--active {
+  color: var(--fg-primary);
+}
+
+.bp-term-tab-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--fg-accent);
+  flex-shrink: 0;
+}
+
+.bp-term-tab-close {
+  font-size: 14px;
+  opacity: 0;
+  margin-left: 2px;
+  border-radius: 3px;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity var(--duration-fast) var(--ease-out),
+              background var(--duration-fast) var(--ease-out);
+}
+
+.bp-term-tab:hover .bp-term-tab-close {
+  opacity: 0.6;
+}
+
+.bp-term-tab-close:hover {
+  opacity: 1 !important;
+  background: var(--bg-active);
+}
+
+/* icon buttons in bottom panel header */
+.bp-icon-btn {
+  background: none;
+  border: none;
+  color: var(--fg-muted);
+  cursor: pointer;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  padding: 0;
+  transition: background var(--duration-fast) var(--ease-out),
+              color var(--duration-fast) var(--ease-out);
+}
+
+.bp-icon-btn:hover {
+  background: var(--bg-hover);
+  color: var(--fg-primary);
+}
+
+.bp-icon-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.bp-icon-btn:disabled:hover {
+  background: none;
+  color: var(--fg-muted);
+}
+
+.bp-term-actions {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.bp-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* ── activity bar item spring animation ── */
