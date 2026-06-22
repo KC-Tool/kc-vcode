@@ -2,6 +2,7 @@ import React, { useEffect, useCallback, useState, useRef } from 'react'
 import { EditorProvider, useEditorContext } from './contexts/EditorContext'
 import { SettingsProvider, useSettings } from './contexts/SettingsContext'
 import { ConfirmProvider, useConfirm } from './contexts/ConfirmContext'
+import { ToastProvider, useToast } from './contexts/ToastContext'
 import TabBar from './components/TabBar'
 import Sidebar from './components/Sidebar'
 import EditorPane from './components/Editor'
@@ -10,19 +11,25 @@ import WelcomePage from './components/WelcomePage'
 import BottomPanel from './components/BottomPanel'
 import CommandPalette from './components/CommandPalette'
 import GoToLine from './components/GoToLine'
+import KeyboardShortcuts from './components/KeyboardShortcuts'
+import ToastContainer from './components/ToastContainer'
 import { FileNode } from '../../preload/index'
 import './assets/styles/global.css'
 
 function AppContent() {
-  const { state, openFile, setDirectory, closeTab, setTheme, openSettings } = useEditorContext()
+  const { state, openFile, setDirectory, closeTab, setTheme, openSettings, setZoom, toggleSplitView, setSplitTab } = useEditorContext()
   const { settings, loaded } = useSettings()
   const { confirm } = useConfirm()
+  const { toast } = useToast()
   const [tree, setTree] = useState<FileNode[]>([])
   const [termVisible, setTermVisible] = useState(false)
   const [paletteVisible, setPaletteVisible] = useState(false)
   const [paletteMode, setPaletteMode] = useState<'command' | 'file'>('command')
   const [goToLineVisible, setGoToLineVisible] = useState(false)
+  const [kbdVisible, setKbdVisible] = useState(false)
   const [zenMode, setZenMode] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
+  const [zoomIndicator, setZoomIndicator] = useState<string | null>(null)
   const dirPathRef = useRef<string | null>(null)
 
   useEffect(() => {
@@ -51,8 +58,9 @@ function AppContent() {
       setTree(result.tree)
       setDirectory(result.rootPath, result.rootName)
       window.electronAPI.setTitle(`${result.rootName} - kc-vcode`)
+      toast('success', `Opened folder: ${result.rootName}`)
     }
-  }, [setDirectory])
+  }, [setDirectory, toast])
 
   useEffect(() => {
     window.electronAPI.onDirectoryOpened((data) => {
@@ -71,6 +79,20 @@ function AppContent() {
       window.electronAPI.removeAllListeners('directory:refreshed')
     }
   }, [openFile, setDirectory, refreshTree])
+
+  // zoom handler
+  const handleZoom = useCallback((delta: number) => {
+    const newZoom = Math.round((state.zoomLevel + delta) * 10) / 10
+    setZoom(newZoom)
+    setZoomIndicator(`${Math.round(newZoom * 100)}%`)
+    setTimeout(() => setZoomIndicator(null), 1200)
+  }, [state.zoomLevel, setZoom])
+
+  const handleZoomReset = useCallback(() => {
+    setZoom(1)
+    setZoomIndicator('100%')
+    setTimeout(() => setZoomIndicator(null), 1200)
+  }, [setZoom])
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     const mod = e.ctrlKey || e.metaKey
@@ -98,6 +120,11 @@ function AppContent() {
       setZenMode(v => !v)
       return
     }
+    if (e.shiftKey && (e.key === 'K' || e.key === 'k')) {
+      e.preventDefault()
+      setKbdVisible(v => !v)
+      return
+    }
     if (e.key === '`') {
       e.preventDefault()
       setTermVisible(v => !v)
@@ -106,6 +133,27 @@ function AppContent() {
     if (e.key === ',') {
       e.preventDefault()
       openSettings()
+      return
+    }
+    if (e.key === '\\') {
+      e.preventDefault()
+      toggleSplitView()
+      toast('info', state.splitView ? 'Split view closed' : 'Split view opened')
+      return
+    }
+    if (e.key === '=' || e.key === '+') {
+      e.preventDefault()
+      handleZoom(0.1)
+      return
+    }
+    if (e.key === '-') {
+      e.preventDefault()
+      handleZoom(-0.1)
+      return
+    }
+    if (e.key === '0') {
+      e.preventDefault()
+      handleZoomReset()
       return
     }
     if (e.key === 'w' && state.activeTabId) {
@@ -123,7 +171,7 @@ function AppContent() {
       }
       closeTab(state.activeTabId)
     }
-  }, [state.activeTabId, state.tabs, closeTab, openSettings, confirm])
+  }, [state.activeTabId, state.tabs, state.splitView, closeTab, openSettings, confirm, toggleSplitView, handleZoom, handleZoomReset, toast])
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown)
@@ -134,10 +182,54 @@ function AppContent() {
     document.documentElement.setAttribute('data-theme', state.theme)
   }, [state.theme])
 
+  // file drag-and-drop
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    if (e.dataTransfer.types.includes('Files')) {
+      setDragOver(true)
+    }
+  }, [])
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    if (e.currentTarget === e.target) {
+      setDragOver(false)
+    }
+  }, [])
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragOver(false)
+    const files = Array.from(e.dataTransfer.files)
+    for (const file of files) {
+      if (file.type === '' || file.name) {
+        const filePath = (file as any).path || file.name
+        try {
+          const res = await window.electronAPI.openFile(filePath)
+          if ('content' in res) {
+            openFile(filePath, file.name, res.content, res.language)
+            toast('success', `Opened: ${file.name}`)
+          }
+        } catch {
+          toast('error', `Failed to open: ${file.name}`)
+        }
+      }
+    }
+  }, [openFile, toast])
+
   const hasTabs = state.tabs.length > 0
 
+  // split view file data
+  const splitFile = state.splitView && state.splitTabId ? state.files[state.splitTabId] : null
+
   return (
-    <div className={`app-layout${zenMode ? ' app-layout--zen' : ''}`}>
+    <div
+      className={`app-layout${zenMode ? ' app-layout--zen' : ''}`}
+      onDragEnter={handleDragEnter}
+      onDragOver={(e) => e.preventDefault()}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      style={state.zoomLevel !== 1 ? { fontSize: `${state.zoomLevel * 100}%` } : undefined}
+    >
       <div className="app-middle">
         <Sidebar
           tree={tree}
@@ -148,7 +240,40 @@ function AppContent() {
         />
         <div className="editor-area">
           {hasTabs && <TabBar />}
-          {hasTabs ? <EditorPane /> : <WelcomePage onOpenFolder={handleOpenFolder} />}
+          {hasTabs ? (
+            state.splitView ? (
+              <div className="editor-split">
+                <div className="editor-split-body">
+                  <div className="editor-split-pane">
+                    <EditorPane />
+                  </div>
+                  <div className="editor-split-divider" />
+                  <div className="editor-split-pane">
+                    <div className="split-tab-bar">
+                      {state.tabs.map(tab => (
+                        <div
+                          key={tab.id}
+                          className={`split-tab${tab.id === state.splitTabId ? ' split-tab--active' : ''}`}
+                          onClick={() => setSplitTab(tab.id)}
+                        >
+                          {tab.name}
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ flex: 1, minHeight: 0 }}>
+                      {splitFile && (
+                        <EditorPane key={`split-${state.splitTabId}`} />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <EditorPane />
+            )
+          ) : (
+            <WelcomePage onOpenFolder={handleOpenFolder} onOpenShortcuts={() => setKbdVisible(true)} />
+          )}
           <BottomPanel cwd={dirPathRef.current || undefined} visible={termVisible} theme={state.theme} onClose={() => setTermVisible(false)} onOpenFile={async (filePath) => { const res = await window.electronAPI.openFile(filePath); if ('error' in res) return; openFile(filePath, filePath.split(/[/\\]/).pop() || '', res.content, res.language) }} />
         </div>
       </div>
@@ -169,6 +294,18 @@ function AppContent() {
         }}
         maxLine={9999}
       />
+      <KeyboardShortcuts visible={kbdVisible} onClose={() => setKbdVisible(false)} />
+      <ToastContainer />
+
+      {dragOver && (
+        <div className="drop-overlay">
+          <div className="drop-overlay-text">Drop files to open</div>
+        </div>
+      )}
+
+      {zoomIndicator && (
+        <div className="zoom-indicator">{zoomIndicator}</div>
+      )}
     </div>
   )
 }
@@ -178,7 +315,9 @@ export default function App() {
     <EditorProvider>
       <SettingsProvider>
         <ConfirmProvider>
-          <AppContent />
+          <ToastProvider>
+            <AppContent />
+          </ToastProvider>
         </ConfirmProvider>
       </SettingsProvider>
     </EditorProvider>
