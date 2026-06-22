@@ -33,6 +33,9 @@ interface EditorState {
   directoryName: string | null
   theme: 'dark' | 'light'
   markers: MarkerData[]
+  zoomLevel: number
+  splitView: boolean
+  splitTabId: string | null
 }
 
 type Action =
@@ -47,6 +50,10 @@ type Action =
   | { type: 'SET_THEME'; payload: { theme: 'dark' | 'light' } }
   | { type: 'OPEN_SETTINGS' }
   | { type: 'SET_MARKERS'; payload: MarkerData[] }
+  | { type: 'SET_ZOOM'; payload: number }
+  | { type: 'TOGGLE_SPLIT_VIEW' }
+  | { type: 'SET_SPLIT_TAB'; payload: string | null }
+  | { type: 'REORDER_TABS'; payload: { fromIndex: number; toIndex: number } }
   | { type: 'RESTORE'; payload: EditorState }
 
 const MAX_TABS = 20
@@ -58,7 +65,7 @@ function loadSavedState(): EditorState | null {
     if (!raw) return null
     const saved = JSON.parse(raw)
     const theme = saved.theme || 'dark'
-    return { tabs: [], activeTabId: null, files: {}, directoryPath: null, directoryName: null, theme }
+    return { tabs: [], activeTabId: null, files: {}, directoryPath: null, directoryName: null, theme, zoomLevel: 1, splitView: false, splitTabId: null }
   } catch {
     return null
   }
@@ -201,6 +208,23 @@ function editorReducer(state: EditorState, action: Action): EditorState {
     case 'SET_MARKERS':
       return { ...state, markers: action.payload }
 
+    case 'SET_ZOOM':
+      return { ...state, zoomLevel: Math.max(0.5, Math.min(3, action.payload)) }
+
+    case 'TOGGLE_SPLIT_VIEW':
+      return { ...state, splitView: !state.splitView, splitTabId: !state.splitView ? state.activeTabId : null }
+
+    case 'SET_SPLIT_TAB':
+      return { ...state, splitTabId: action.payload }
+
+    case 'REORDER_TABS': {
+      const { fromIndex, toIndex } = action.payload
+      const tabs = [...state.tabs]
+      const [moved] = tabs.splice(fromIndex, 1)
+      tabs.splice(toIndex, 0, moved)
+      return { ...state, tabs }
+    }
+
     default:
       return state
   }
@@ -216,7 +240,10 @@ const initialState: EditorState = saved || {
   directoryPath: null,
   directoryName: null,
   theme: 'dark',
-  markers: []
+  markers: [],
+  zoomLevel: 1,
+  splitView: false,
+  splitTabId: null
 }
 
 interface EditorContextType {
@@ -232,6 +259,10 @@ interface EditorContextType {
   setTheme: (theme: 'dark' | 'light') => void
   openSettings: () => void
   setMarkers: (markers: MarkerData[]) => void
+  setZoom: (level: number) => void
+  toggleSplitView: () => void
+  setSplitTab: (tabId: string | null) => void
+  reorderTabs: (fromIndex: number, toIndex: number) => void
 }
 
 const EditorContext = createContext<EditorContextType | null>(null)
@@ -286,10 +317,27 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: 'SET_MARKERS', payload: markers })
   }, [])
 
+  const setZoom = useCallback((level: number) => {
+    dispatch({ type: 'SET_ZOOM', payload: level })
+  }, [])
+
+  const toggleSplitView = useCallback(() => {
+    dispatch({ type: 'TOGGLE_SPLIT_VIEW' })
+  }, [])
+
+  const setSplitTab = useCallback((tabId: string | null) => {
+    dispatch({ type: 'SET_SPLIT_TAB', payload: tabId })
+  }, [])
+
+  const reorderTabs = useCallback((fromIndex: number, toIndex: number) => {
+    dispatch({ type: 'REORDER_TABS', payload: { fromIndex, toIndex } })
+  }, [])
+
   return (
     <EditorContext.Provider value={{
       state, openFile, closeTab, setActiveTab,
-      updateContent, markSaved, setDirectory, closeAllTabs, setCursor, setTheme, openSettings, setMarkers
+      updateContent, markSaved, setDirectory, closeAllTabs, setCursor, setTheme, openSettings, setMarkers,
+      setZoom, toggleSplitView, setSplitTab, reorderTabs
     }}>
       {children}
     </EditorContext.Provider>
