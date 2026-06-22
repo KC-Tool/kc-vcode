@@ -6,7 +6,7 @@ interface StatusBarProps {
   onOpenShortcuts?: () => void
 }
 
-export default function StatusBar({ onToggleTerminal, onOpenShortcuts }: StatusBarProps) {
+export default React.memo(function StatusBar({ onToggleTerminal, onOpenShortcuts }: StatusBarProps) {
   const { state, setTheme } = useEditorContext()
   const activeFile = state.activeTabId ? state.files[state.activeTabId] : null
 
@@ -62,4 +62,4 @@ export default function StatusBar({ onToggleTerminal, onOpenShortcuts }: StatusB
       </div>
     </div>
   )
-}
+})

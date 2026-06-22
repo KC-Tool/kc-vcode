@@ -10,7 +10,7 @@ interface ContextMenu {
   y: number
 }
 
-export default function TabBar() {
+export default React.memo(function TabBar() {
   const { state, setActiveTab, closeTab, closeAllTabs, reorderTabs } = useEditorContext()
   const { confirm } = useConfirm()
   const { settings } = useSettings()
@@ -205,4 +205,4 @@ export default function TabBar() {
       )}
     </div>
   )
-}
+})

@@ -19,7 +19,7 @@ interface Props {
   onOpenFile: (path: string) => void
 }
 
-export default function BottomPanel({ cwd, visible, theme, onClose, onOpenFile }: Props) {
+export default React.memo(function BottomPanel({ cwd, visible, theme, onClose, onOpenFile }: Props) {
   const [activeTab, setActiveTab] = useState<BottomTab>('terminal')
   const [termTabs, setTermTabs] = useState<TermTab[]>([{ id: 0, label: 'powershell' }])
   const [activeTermTab, setActiveTermTab] = useState(0)
@@ -139,4 +139,4 @@ export default function BottomPanel({ cwd, visible, theme, onClose, onOpenFile }
       </div>
     </div>
   )
-}
+})
