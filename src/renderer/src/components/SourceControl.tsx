@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useEditorContext } from '../contexts/EditorContext'
+import GitDiffViewer from './GitDiffViewer'
 
 interface GitFile { path: string; status: string; staged: boolean }
 interface GitStatus { branch: string; files: GitFile[]; ahead: number; behind: number }
@@ -25,6 +26,7 @@ export default function SourceControl({ dirPath, onRefresh }: Props) {
   const [showLog, setShowLog] = useState(false)
   const [log, setLog] = useState<GitLogEntry[]>([])
   const [output, setOutput] = useState('')
+  const [diffFile, setDiffFile] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     if (!dirPath) return
@@ -216,26 +218,30 @@ export default function SourceControl({ dirPath, onRefresh }: Props) {
         {staged.length > 0 && (
           <div className="git-section">
             <div className="git-section-header"><span>Staged Changes</span><span className="git-count">{staged.length}</span></div>
-            {staged.map(f => <GitFileItem key={f.path} file={f} onStage={handleStage} onUnstage={handleUnstage} onDiscard={handleDiscard} onClick={handleFileClick} />)}
+            {staged.map(f => <GitFileItem key={f.path} file={f} onStage={handleStage} onUnstage={handleUnstage} onDiscard={handleDiscard} onClick={handleFileClick} onDiff={setDiffFile} />)}
           </div>
         )}
         {unstaged.length > 0 && (
           <div className="git-section">
             <div className="git-section-header"><span>Changes</span><span className="git-count">{unstaged.length}</span></div>
-            {unstaged.map(f => <GitFileItem key={f.path} file={f} onStage={handleStage} onUnstage={handleUnstage} onDiscard={handleDiscard} onClick={handleFileClick} />)}
+            {unstaged.map(f => <GitFileItem key={f.path} file={f} onStage={handleStage} onUnstage={handleUnstage} onDiscard={handleDiscard} onClick={handleFileClick} onDiff={setDiffFile} />)}
           </div>
         )}
         {status && status.files.length === 0 && (
           <div style={{ padding: 16, textAlign: 'center', color: 'var(--fg-muted)', fontSize: 12 }}>No changes</div>
         )}
       </div>
+
+      {diffFile && dirPath && (
+        <GitDiffViewer dirPath={dirPath} filePath={diffFile} onClose={() => setDiffFile(null)} />
+      )}
     </div>
   )
 }
 
-function GitFileItem({ file, onStage, onUnstage, onDiscard, onClick }: {
+function GitFileItem({ file, onStage, onUnstage, onDiscard, onClick, onDiff }: {
   file: GitFile; onStage: (p: string) => void; onUnstage: (p: string) => void
-  onDiscard: (p: string) => void; onClick: (p: string) => void
+  onDiscard: (p: string) => void; onClick: (p: string) => void; onDiff: (p: string) => void
 }) {
   const icon = STATUS_ICONS[file.status] || '?'
   const color = file.status === 'deleted' ? 'var(--fg-danger)' : file.status === 'added' ? 'var(--fg-success)' : file.status === 'untracked' ? 'var(--fg-warn)' : 'var(--fg-secondary)'
@@ -244,6 +250,9 @@ function GitFileItem({ file, onStage, onUnstage, onDiscard, onClick }: {
       <span className="git-file-icon" style={{ color }}>{icon}</span>
       <span className="git-file-name" onClick={() => onClick(file.path)} title={file.path}>{file.path.split('/').pop()}</span>
       <span className="git-file-actions">
+        {file.status !== 'untracked' && file.status !== 'added' && (
+          <button className="git-action-btn" onClick={() => onDiff(file.path)} title="View Diff">◐</button>
+        )}
         {file.staged
           ? <button className="git-action-btn" onClick={() => onUnstage(file.path)} title="Unstage">−</button>
           : <button className="git-action-btn" onClick={() => onStage(file.path)} title="Stage">+</button>}
