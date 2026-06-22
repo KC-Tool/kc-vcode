@@ -58,6 +58,9 @@ type Action =
 
 const MAX_TABS = 20
 const STORAGE_KEY = 'kc-edit-state'
+const SAVE_DEBOUNCE_MS = 2000
+
+let saveTimer: ReturnType<typeof setTimeout> | null = null
 
 function loadSavedState(): EditorState | null {
   try {
@@ -72,18 +75,15 @@ function loadSavedState(): EditorState | null {
 }
 
 function saveState(state: EditorState): void {
-  try {
-    // only save metadata, not full file contents — saves memory
-    const lite: any = { ...state }
-    const files: Record<string, any> = {}
-    for (const [k, v] of Object.entries(state.files)) {
-      files[k] = { path: v.path, language: v.language, cursorLine: v.cursorLine, cursorColumn: v.cursorColumn }
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => {
+    try {
+      const lite: any = { theme: state.theme, zoomLevel: state.zoomLevel }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(lite))
+    } catch {
+      // localStorage full or blocked
     }
-    lite.files = files
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(lite))
-  } catch {
-    // localStorage full or blocked — silently fail
-  }
+  }, SAVE_DEBOUNCE_MS)
 }
 
 function editorReducer(state: EditorState, action: Action): EditorState {
@@ -270,8 +270,26 @@ const EditorContext = createContext<EditorContextType | null>(null)
 export function EditorProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(editorReducer, initialState)
 
-  // persist on every state change
+  // persist on every state change (debounced)
   useEffect(() => { saveState(state) }, [state])
+
+  // flush pending save on unload
+  useEffect(() => {
+    const flush = () => {
+      if (saveTimer) {
+        clearTimeout(saveTimer)
+        try {
+          const lite: any = { theme: state.theme, zoomLevel: state.zoomLevel }
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(lite))
+        } catch {}
+      }
+    }
+    window.addEventListener('beforeunload', flush)
+    return () => {
+      window.removeEventListener('beforeunload', flush)
+      flush()
+    }
+  }, [state.theme, state.zoomLevel])
 
   const openFile = useCallback((path: string, name: string, content: string, language: string) => {
     dispatch({ type: 'OPEN_FILE', payload: { path, name, content, language } })

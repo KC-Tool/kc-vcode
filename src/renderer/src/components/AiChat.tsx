@@ -13,6 +13,13 @@ const PROVIDERS: Record<string, { label: string; models: string[] }> = {
   anthropic: { label: 'Anthropic', models: ['claude-sonnet-4-20250514', 'claude-3-5-sonnet-20241022', 'claude-3-haiku-20240307'] }
 }
 
+const MAX_MESSAGES = 50
+
+function trimMessages(msgs: ChatMessage[]): ChatMessage[] {
+  if (msgs.length <= MAX_MESSAGES) return msgs
+  return msgs.slice(msgs.length - MAX_MESSAGES)
+}
+
 export default function AiChat() {
   const { state } = useEditorContext()
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -87,7 +94,7 @@ export default function AiChat() {
     if (!text || loading) return
 
     const userMsg: ChatMessage = { role: 'user', content: text }
-    setMessages(prev => [...prev, userMsg])
+    setMessages(prev => trimMessages([...prev, userMsg]))
     setInput('')
     setLoading(true)
 

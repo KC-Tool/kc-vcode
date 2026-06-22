@@ -88,6 +88,17 @@ function AppContent() {
     setTimeout(() => setZoomIndicator(null), 1200)
   }, [state.zoomLevel, setZoom])
 
+  // stable callbacks for child components
+  const handleOpenShortcuts = useCallback(() => setKbdVisible(true), [])
+  const handleCloseTerm = useCallback(() => setTermVisible(false), [])
+  const handleToggleTerm = useCallback(() => setTermVisible(v => !v), [])
+
+  const handleBottomOpenFile = useCallback(async (filePath: string) => {
+    const res = await window.electronAPI.openFile(filePath)
+    if ('error' in res) return
+    openFile(filePath, filePath.split(/[/\\]/).pop() || '', res.content, res.language)
+  }, [openFile])
+
   const handleZoomReset = useCallback(() => {
     setZoom(1)
     setZoomIndicator('100%')
@@ -272,19 +283,19 @@ function AppContent() {
               <EditorPane />
             )
           ) : (
-            <WelcomePage onOpenFolder={handleOpenFolder} onOpenShortcuts={() => setKbdVisible(true)} />
+            <WelcomePage onOpenFolder={handleOpenFolder} onOpenShortcuts={handleOpenShortcuts} />
           )}
-          <BottomPanel cwd={dirPathRef.current || undefined} visible={termVisible} theme={state.theme} onClose={() => setTermVisible(false)} onOpenFile={async (filePath) => { const res = await window.electronAPI.openFile(filePath); if ('error' in res) return; openFile(filePath, filePath.split(/[/\\]/).pop() || '', res.content, res.language) }} />
+          <BottomPanel cwd={dirPathRef.current || undefined} visible={termVisible} theme={state.theme} onClose={handleCloseTerm} onOpenFile={handleBottomOpenFile} />
         </div>
       </div>
-      <StatusBar onToggleTerminal={() => setTermVisible(v => !v)} onOpenShortcuts={() => setKbdVisible(true)} />
+      <StatusBar onToggleTerminal={handleToggleTerm} onOpenShortcuts={handleOpenShortcuts} />
       <CommandPalette
         visible={paletteVisible}
         mode={paletteMode}
         onClose={() => setPaletteVisible(false)}
         tree={tree}
         onOpenFolder={handleOpenFolder}
-        onToggleTerminal={() => setTermVisible(v => !v)}
+        onToggleTerminal={handleToggleTerm}
       />
       <GoToLine
         visible={goToLineVisible}
