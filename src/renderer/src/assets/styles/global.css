@@ -2638,74 +2638,80 @@ body {
   to { opacity: 1; transform: scale(1); }
 }
 
-/* ── terminal multi-tab ── */
-.terminal-tabs {
+/* ── terminal multi-tab (inline in bottom panel header) ── */
+.bp-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bp-term-tabs {
   display: flex;
   align-items: center;
   gap: 0;
-  flex: 1;
-  overflow-x: auto;
-  scrollbar-width: none;
 }
 
-.terminal-tabs::-webkit-scrollbar { display: none; }
-
-.terminal-tab {
-  display: flex;
+.bp-term-tab {
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 12px;
-  height: 28px;
+  gap: 5px;
+  padding: 2px 8px;
   font-size: 11px;
   color: var(--fg-muted);
   cursor: pointer;
   white-space: nowrap;
-  border-right: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
   transition: background var(--duration-fast) var(--ease-out),
               color var(--duration-fast) var(--ease-out);
 }
 
-.terminal-tab:hover {
+.bp-term-tab:hover {
   background: var(--bg-hover);
   color: var(--fg-secondary);
 }
 
-.terminal-tab--active {
-  background: var(--bg-primary);
+.bp-term-tab--active {
+  background: var(--bg-tertiary);
   color: var(--fg-primary);
 }
 
-.terminal-tab-close {
+.bp-term-tab-icon {
+  font-size: 8px;
+  line-height: 1;
+}
+
+.bp-term-tab-close {
   font-size: 14px;
   opacity: 0;
-  margin-left: 4px;
+  margin-left: 2px;
   transition: opacity var(--duration-fast) var(--ease-out);
 }
 
-.terminal-tab:hover .terminal-tab-close {
+.bp-term-tab:hover .bp-term-tab-close {
   opacity: 0.6;
 }
 
-.terminal-tab-close:hover {
+.bp-term-tab-close:hover {
   opacity: 1 !important;
 }
 
-.terminal-tab-add {
+.bp-term-tab-add {
   background: none;
   border: none;
   color: var(--fg-muted);
   cursor: pointer;
-  font-size: 16px;
-  width: 28px;
-  height: 28px;
+  font-size: 15px;
+  width: 22px;
+  height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: var(--radius-sm);
   transition: background var(--duration-fast) var(--ease-out),
               color var(--duration-fast) var(--ease-out);
 }
 
-.terminal-tab-add:hover {
+.bp-term-tab-add:hover {
   background: var(--bg-hover);
   color: var(--fg-primary);
 }

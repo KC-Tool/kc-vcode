@@ -1,12 +1,7 @@
-import React, { useRef, useEffect, useState } from 'react'
+import React, { useRef, useEffect } from 'react'
 import { Terminal as XTerm } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
-
-interface TermTab {
-  id: number
-  label: string
-}
 
 interface TerminalProps {
   cwd?: string
@@ -36,9 +31,6 @@ export default function TerminalPanel({ cwd, visible, theme }: TerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<XTerm | null>(null)
   const fitRef = useRef<FitAddon | null>(null)
-  const [tabs, setTabs] = useState<TermTab[]>([{ id: 0, label: 'Terminal 1' }])
-  const [activeTabId, setActiveTabId] = useState(0)
-  const nextIdRef = useRef(1)
 
   useEffect(() => {
     if (!visible || !containerRef.current) {
@@ -64,11 +56,8 @@ export default function TerminalPanel({ cwd, visible, theme }: TerminalProps) {
     termRef.current = term
     fitRef.current = fitAddon
 
-    const onDataHandler = (data: string) => window.electronAPI.terminalInput(data)
-    const onTermDataHandler = (data: string) => term.write(data)
-
-    term.onData(onDataHandler)
-    window.electronAPI.onTerminalData(onTermDataHandler)
+    term.onData((data) => window.electronAPI.terminalInput(data))
+    window.electronAPI.onTerminalData((data) => term.write(data))
     window.electronAPI.createTerminal(cwd)
 
     setTimeout(() => { fitAddon.fit(); term.focus() }, 300)
@@ -94,62 +83,7 @@ export default function TerminalPanel({ cwd, visible, theme }: TerminalProps) {
     }
   }, [theme])
 
-  const handleAddTab = () => {
-    const id = nextIdRef.current++
-    setTabs(prev => [...prev, { id, label: `Terminal ${id + 1}` }])
-    setActiveTabId(id)
-    // create a new pty for the new tab
-    window.electronAPI.createTerminal(cwd)
-    setTimeout(() => {
-      if (fitRef.current) fitRef.current.fit()
-      termRef.current?.focus()
-    }, 100)
-  }
-
-  const handleCloseTab = (tabId: number) => {
-    if (tabs.length <= 1) return
-    const idx = tabs.findIndex(t => t.id === tabId)
-    const newTabs = tabs.filter(t => t.id !== tabId)
-    setTabs(newTabs)
-    if (activeTabId === tabId) {
-      setActiveTabId(newTabs[Math.min(idx, newTabs.length - 1)].id)
-    }
-  }
-
-  const handleSwitchTab = (tabId: number) => {
-    if (tabId === activeTabId) return
-    setActiveTabId(tabId)
-    setTimeout(() => {
-      if (fitRef.current) fitRef.current.fit()
-      termRef.current?.focus()
-    }, 50)
-  }
-
   return (
-    <div className={`terminal-panel${visible ? ' terminal-panel--open' : ''}`}>
-      <div className="terminal-header">
-        <div className="terminal-tabs">
-          {tabs.map(tab => (
-            <div
-              key={tab.id}
-              className={`terminal-tab${tab.id === activeTabId ? ' terminal-tab--active' : ''}`}
-              onClick={() => handleSwitchTab(tab.id)}
-            >
-              <span>{tab.label}</span>
-              {tabs.length > 1 && (
-                <span
-                  className="terminal-tab-close"
-                  onClick={(e) => { e.stopPropagation(); handleCloseTab(tab.id) }}
-                >
-                  ×
-                </span>
-              )}
-            </div>
-          ))}
-          <button className="terminal-tab-add" onClick={handleAddTab} title="New Terminal">+</button>
-        </div>
-      </div>
-      <div className="terminal-body" ref={containerRef} />
-    </div>
+    <div className="terminal-body" ref={containerRef} style={{ height: '100%' }} />
   )
 }
