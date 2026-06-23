@@ -26,7 +26,30 @@ interface CodeAction {
   changes: { file: string; start: number; end: number; newText: string }[]
 }
 
-const fileCache = new Map<string, { version: number; content: string }>()
+const MAX_CACHED_FILES = 200
+const MAX_CACHED_SERVICES = 32
+
+type FileEntry = { version: number; content: string }
+type ServiceEntry = { service: ts.LanguageService; content: string; lastUsed: number }
+
+const fileCache = new Map<string, FileEntry>()
+const serviceCache = new Map<string, ServiceEntry>()
+
+function touchFile(name: string, content: string, version: number): FileEntry {
+  // 顺手驱逐老条目，避免依赖文件永久占内存
+  if (fileCache.size >= MAX_CACHED_FILES) {
+    const oldest = fileCache.keys().next().value
+    if (oldest) fileCache.delete(oldest)
+  }
+  const entry: FileEntry = { version, content }
+  fileCache.set(name, entry)
+  return entry
+}
+
+function disposeService(entry: ServiceEntry | undefined): void {
+  if (!entry) return
+  try { entry.service.dispose() } catch { /* noop */ }
+}
 
 function getDefaultCompilerOptions(): ts.CompilerOptions {
   return {
@@ -48,33 +71,56 @@ function getDefaultCompilerOptions(): ts.CompilerOptions {
   }
 }
 
-function createLanguageService(filePath: string, content: string): {
-  service: ts.LanguageService
-  fileName: string
-} {
-  const fileName = filePath.replace(/\\/g, '/')
-  const version = (fileCache.get(fileName)?.version || 0) + 1
-  fileCache.set(fileName, { version, content })
+function evictOldestService(): void {
+  if (serviceCache.size < MAX_CACHED_SERVICES) return
+  let oldestKey: string | null = null
+  let oldestTime = Infinity
+  for (const [k, v] of serviceCache) {
+    if (v.lastUsed < oldestTime) {
+      oldestTime = v.lastUsed
+      oldestKey = k
+    }
+  }
+  if (oldestKey) {
+    disposeService(serviceCache.get(oldestKey))
+    serviceCache.delete(oldestKey)
+  }
+}
+
+function getOrCreateService(fileName: string, content: string): ts.LanguageService {
+  const now = Date.now()
+  const existing = serviceCache.get(fileName)
+
+  if (existing && existing.content === content) {
+    existing.lastUsed = now
+    return existing.service
+  }
+
+  // 内容变了：先 dispose 老的，避免旧 service 永久占内存
+  disposeService(existing)
+  serviceCache.delete(fileName)
+
+  // 文件版本号自增
+  const prev = fileCache.get(fileName)
+  const nextVersion = (prev?.version || 0) + 1
+  touchFile(fileName, content, nextVersion)
 
   const compilerOptions = getDefaultCompilerOptions()
-
   const host: ts.LanguageServiceHost = {
     getScriptFileNames: () => [fileName],
     getScriptVersion: (name) => String(fileCache.get(name)?.version || 0),
     getScriptSnapshot: (name) => {
       const cached = fileCache.get(name)
-      if (cached) {
-        return ts.ScriptSnapshot.fromString(cached.content)
-      }
+      if (cached) return ts.ScriptSnapshot.fromString(cached.content)
       try {
         const fileContent = fs.readFileSync(name, 'utf-8')
-        fileCache.set(name, { version: 1, content: fileContent })
+        touchFile(name, fileContent, 1)
         return ts.ScriptSnapshot.fromString(fileContent)
       } catch {
         return undefined
       }
     },
-    getCurrentDirectory: () => path.dirname(filePath),
+    getCurrentDirectory: () => path.dirname(fileName),
     getCompilationSettings: () => compilerOptions,
     getDefaultLibFileName: (opts) => ts.getDefaultLibFilePath(opts),
     fileExists: (name) => fileCache.has(name) || fs.existsSync(name),
@@ -85,19 +131,36 @@ function createLanguageService(filePath: string, content: string): {
     },
     readDirectory: ts.sys.readDirectory,
     getDirectories: ts.sys.getDirectories,
-    directoryExists: ts.sys.directoryExists,
-    getRootFiles: () => [fileName],
-    getScriptFileNames: () => [fileName],
+    directoryExists: ts.sys.directoryExists
   }
 
+  evictOldestService()
   const service = ts.createLanguageService(host, ts.createDocumentRegistry())
-  return { service, fileName }
+  serviceCache.set(fileName, { service, content, lastUsed: now })
+  return service
+}
+
+function getPos(content: string, line: number, column: number): number {
+  return content.split('\n').slice(0, line - 1).join('\n').length + column - 1
+}
+
+function lineColFromOffset(content: string, offset: number): { line: number; column: number } {
+  const lines = content.split('\n')
+  let chars = 0
+  for (let i = 0; i < lines.length; i++) {
+    chars += lines[i].length + 1
+    if (chars > offset) {
+      return { line: i + 1, column: offset - (chars - lines[i].length - 1) + 1 }
+    }
+  }
+  return { line: 1, column: 1 }
 }
 
 export function getHover(filePath: string, content: string, line: number, column: number): HoverResult | null {
   try {
-    const { service, fileName } = createLanguageService(filePath, content)
-    const pos = content.split('\n').slice(0, line - 1).join('\n').length + column - 1
+    const fileName = filePath.replace(/\\/g, '/')
+    const service = getOrCreateService(fileName, content)
+    const pos = getPos(content, line, column)
     const quickInfo = service.getQuickInfoAtPosition(fileName, pos)
     if (!quickInfo) return null
 
@@ -113,8 +176,9 @@ export function getHover(filePath: string, content: string, line: number, column
 
 export function getDefinition(filePath: string, content: string, line: number, column: number): DefinitionResult | null {
   try {
-    const { service, fileName } = createLanguageService(filePath, content)
-    const pos = content.split('\n').slice(0, line - 1).join('\n').length + column - 1
+    const fileName = filePath.replace(/\\/g, '/')
+    const service = getOrCreateService(fileName, content)
+    const pos = getPos(content, line, column)
     const defs = service.getDefinitionAtPosition(fileName, pos)
     if (!defs || defs.length === 0) return null
 
@@ -122,19 +186,7 @@ export function getDefinition(filePath: string, content: string, line: number, c
     const defContent = fileCache.get(def.fileName)?.content
     if (!defContent) return null
 
-    const defLines = defContent.split('\n')
-    let defLine = 1
-    let defCol = def.textSpan.start
-    let chars = 0
-    for (let i = 0; i < defLines.length; i++) {
-      chars += defLines[i].length + 1
-      if (chars > def.textSpan.start) {
-        defLine = i + 1
-        defCol = def.textSpan.start - (chars - defLines[i].length - 1) + 1
-        break
-      }
-    }
-
+    const { line: defLine, column: defCol } = lineColFromOffset(defContent, def.textSpan.start)
     return { file: def.fileName, line: defLine, column: defCol }
   } catch {
     return null
@@ -143,27 +195,16 @@ export function getDefinition(filePath: string, content: string, line: number, c
 
 export function getReferences(filePath: string, content: string, line: number, column: number): ReferenceResult[] {
   try {
-    const { service, fileName } = createLanguageService(filePath, content)
-    const pos = content.split('\n').slice(0, line - 1).join('\n').length + column - 1
+    const fileName = filePath.replace(/\\/g, '/')
+    const service = getOrCreateService(fileName, content)
+    const pos = getPos(content, line, column)
     const refs = service.getReferencesAtPosition(fileName, pos)
     if (!refs) return []
 
     return refs.map(ref => {
       const refContent = fileCache.get(ref.fileName)?.content || ''
-      const refLines = refContent.split('\n')
-      let refLine = 1
-      let refCol = ref.textSpan.start
-      let chars = 0
-      for (let i = 0; i < refLines.length; i++) {
-        chars += refLines[i].length + 1
-        if (chars > ref.textSpan.start) {
-          refLine = i + 1
-          refCol = ref.textSpan.start - (chars - refLines[i].length - 1) + 1
-          break
-        }
-      }
-
-      const text = refLines[refLine - 1]?.trim() || ''
+      const { line: refLine, column: refCol } = lineColFromOffset(refContent, ref.textSpan.start)
+      const text = refContent.split('\n')[refLine - 1]?.trim() || ''
       return { file: ref.fileName, line: refLine, column: refCol, text }
     })
   } catch {
@@ -173,8 +214,9 @@ export function getReferences(filePath: string, content: string, line: number, c
 
 export function getCodeActions(filePath: string, content: string, line: number, column: number): CodeAction[] {
   try {
-    const { service, fileName } = createLanguageService(filePath, content)
-    const pos = content.split('\n').slice(0, line - 1).join('\n').length + column - 1
+    const fileName = filePath.replace(/\\/g, '/')
+    const service = getOrCreateService(fileName, content)
+    const pos = getPos(content, line, column)
     const diagnostics = [
       ...(service.getSemanticDiagnostics(fileName) || []),
       ...(service.getSyntacticDiagnostics(fileName) || [])
@@ -217,21 +259,18 @@ export function getDiagnostics(filePath: string, content: string): Array<{
   code: number
 }> {
   try {
-    const { service, fileName } = createLanguageService(filePath, content)
+    const fileName = filePath.replace(/\\/g, '/')
+    const service = getOrCreateService(fileName, content)
     const diags = [
       ...service.getSemanticDiagnostics(fileName),
       ...service.getSyntacticDiagnostics(fileName)
     ]
 
-    const lines = content.split('\n')
     return diags.map(d => {
       const start = d.start || 0
-      const startLine = content.slice(0, start).split('\n').length
-      const startCol = start - content.slice(0, start).lastIndexOf('\n')
-
+      const { line: startLine, column: startCol } = lineColFromOffset(content, start)
       const end = start + (d.length || 0)
-      const endLine = content.slice(0, end).split('\n').length
-      const endCol = end - content.slice(0, end).lastIndexOf('\n')
+      const { line: endLine, column: endCol } = lineColFromOffset(content, end)
 
       return {
         line: startLine,
@@ -247,4 +286,17 @@ export function getDiagnostics(filePath: string, content: string): Array<{
   } catch {
     return []
   }
+}
+
+export function clearLspCache(): void {
+  for (const entry of serviceCache.values()) disposeService(entry)
+  serviceCache.clear()
+  fileCache.clear()
+}
+
+export function dropLspFile(filePath: string): void {
+  const fileName = filePath.replace(/\\/g, '/')
+  disposeService(serviceCache.get(fileName))
+  serviceCache.delete(fileName)
+  fileCache.delete(fileName)
 }

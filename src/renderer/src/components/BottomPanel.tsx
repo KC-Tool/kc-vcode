@@ -3,6 +3,7 @@ import ProblemsPanel from './ProblemsPanel'
 import TerminalPanel from './Terminal'
 import DebugToolbar from './DebugToolbar'
 import { useEditorContext } from '../contexts/EditorContext'
+import { useEditorUI } from '../contexts/EditorUIContext'
 
 type BottomTab = 'problems' | 'terminal' | 'debug'
 
@@ -24,8 +25,8 @@ export default React.memo(function BottomPanel({ cwd, visible, theme, onClose, o
   const [termTabs, setTermTabs] = useState<TermTab[]>([{ id: 0, label: 'powershell' }])
   const [activeTermTab, setActiveTermTab] = useState(0)
   const nextIdRef = useRef(1)
-  const { state } = useEditorContext()
-  const markers = state?.markers || []
+  useEditorContext() // 留着保持订阅一致
+  const { markers } = useEditorUI()
   const errCount = markers.filter(m => m.severity === 'error').length
   const warnCount = markers.filter(m => m.severity === 'warning').length
 

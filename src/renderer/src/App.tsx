@@ -1,5 +1,6 @@
 import React, { useEffect, useCallback, useState, useRef } from 'react'
 import { EditorProvider, useEditorContext } from './contexts/EditorContext'
+import { EditorUIProvider, useEditorUI } from './contexts/EditorUIContext'
 import { SettingsProvider, useSettings } from './contexts/SettingsContext'
 import { ConfirmProvider, useConfirm } from './contexts/ConfirmContext'
 import { ToastProvider, useToast } from './contexts/ToastContext'
@@ -17,7 +18,8 @@ import { FileNode } from '../../preload/index'
 import './assets/styles/global.css'
 
 function AppContent() {
-  const { state, openFile, setDirectory, closeTab, setTheme, openSettings, setZoom, toggleSplitView, setSplitTab } = useEditorContext()
+  const { state, openFile, setDirectory, closeTab, setTheme, openSettings } = useEditorContext()
+  const { zoomLevel, setZoom, splitView, splitTabId, toggleSplitView, setSplitTab } = useEditorUI()
   const { settings, loaded } = useSettings()
   const { confirm } = useConfirm()
   const { toast } = useToast()
@@ -38,7 +40,6 @@ function AppContent() {
     }
   }, [loaded, settings.appearance.theme, state.theme, setTheme])
 
-  // apply sidebar width from settings
   useEffect(() => {
     if (loaded) {
       document.documentElement.style.setProperty('--sidebar-width', settings.appearance.sidebarWidth + 'px')
@@ -80,15 +81,13 @@ function AppContent() {
     }
   }, [openFile, setDirectory, refreshTree])
 
-  // zoom handler
   const handleZoom = useCallback((delta: number) => {
-    const newZoom = Math.round((state.zoomLevel + delta) * 10) / 10
+    const newZoom = Math.round((zoomLevel + delta) * 10) / 10
     setZoom(newZoom)
     setZoomIndicator(`${Math.round(newZoom * 100)}%`)
     setTimeout(() => setZoomIndicator(null), 1200)
-  }, [state.zoomLevel, setZoom])
+  }, [zoomLevel, setZoom])
 
-  // stable callbacks for child components
   const handleOpenShortcuts = useCallback(() => setKbdVisible(true), [])
   const handleCloseTerm = useCallback(() => setTermVisible(false), [])
   const handleToggleTerm = useCallback(() => setTermVisible(v => !v), [])
@@ -148,8 +147,8 @@ function AppContent() {
     }
     if (e.key === '\\') {
       e.preventDefault()
-      toggleSplitView()
-      toast('info', state.splitView ? 'Split view closed' : 'Split view opened')
+      toggleSplitView(state.activeTabId)
+      toast('info', splitView ? 'Split view closed' : 'Split view opened')
       return
     }
     if (e.key === '=' || e.key === '+') {
@@ -182,7 +181,7 @@ function AppContent() {
       }
       closeTab(state.activeTabId)
     }
-  }, [state.activeTabId, state.tabs, state.splitView, closeTab, openSettings, confirm, toggleSplitView, handleZoom, handleZoomReset, toast])
+  }, [state.activeTabId, state.tabs, splitView, closeTab, openSettings, confirm, toggleSplitView, handleZoom, handleZoomReset, toast])
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown)
@@ -193,7 +192,6 @@ function AppContent() {
     document.documentElement.setAttribute('data-theme', state.theme)
   }, [state.theme])
 
-  // file drag-and-drop
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     if (e.dataTransfer.types.includes('Files')) {
@@ -229,8 +227,7 @@ function AppContent() {
 
   const hasTabs = state.tabs.length > 0
 
-  // split view file data
-  const splitFile = state.splitView && state.splitTabId ? state.files[state.splitTabId] : null
+  const splitFile = splitView && splitTabId ? state.files[splitTabId] : null
 
   return (
     <div
@@ -239,7 +236,7 @@ function AppContent() {
       onDragOver={(e) => e.preventDefault()}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      style={state.zoomLevel !== 1 ? { fontSize: `${state.zoomLevel * 100}%` } : undefined}
+      style={zoomLevel !== 1 ? { fontSize: `${zoomLevel * 100}%` } : undefined}
     >
       <div className="app-middle">
         <Sidebar
@@ -252,7 +249,7 @@ function AppContent() {
         <div className="editor-area">
           {hasTabs && <TabBar />}
           {hasTabs ? (
-            state.splitView ? (
+            splitView ? (
               <div className="editor-split">
                 <div className="editor-split-body">
                   <div className="editor-split-pane">
@@ -264,7 +261,7 @@ function AppContent() {
                       {state.tabs.map(tab => (
                         <div
                           key={tab.id}
-                          className={`split-tab${tab.id === state.splitTabId ? ' split-tab--active' : ''}`}
+                          className={`split-tab${tab.id === splitTabId ? ' split-tab--active' : ''}`}
                           onClick={() => setSplitTab(tab.id)}
                         >
                           {tab.name}
@@ -273,7 +270,7 @@ function AppContent() {
                     </div>
                     <div style={{ flex: 1, minHeight: 0 }}>
                       {splitFile && (
-                        <EditorPane key={`split-${state.splitTabId}`} />
+                        <EditorPane key={`split-${splitTabId}`} />
                       )}
                     </div>
                   </div>
@@ -324,13 +321,15 @@ function AppContent() {
 export default function App() {
   return (
     <EditorProvider>
-      <SettingsProvider>
-        <ConfirmProvider>
-          <ToastProvider>
-            <AppContent />
-          </ToastProvider>
-        </ConfirmProvider>
-      </SettingsProvider>
+      <EditorUIProvider>
+        <SettingsProvider>
+          <ConfirmProvider>
+            <ToastProvider>
+              <AppContent />
+            </ToastProvider>
+          </ConfirmProvider>
+        </SettingsProvider>
+      </EditorUIProvider>
     </EditorProvider>
   )
 }

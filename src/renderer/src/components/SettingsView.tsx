@@ -189,15 +189,22 @@ function AiSettingsPanel() {
 
   React.useEffect(() => {
     window.electronAPI.llmGetConfig().then(cfg => {
-      if (cfg) {
-        setProvider(cfg.provider || 'openai')
-        setModel(cfg.model || 'gpt-4o')
+      const c = cfg as { provider?: string; apiKey?: string; model?: string; baseUrl?: string } | null
+      if (c) {
+        setProvider(c.provider || 'openai')
+        setModel(c.model || 'gpt-4o')
+        if (c.apiKey) setApiKey(c.apiKey)
+        if (c.baseUrl) setBaseUrl(c.baseUrl)
       }
     })
   }, [])
 
   const handleSave = async () => {
-    await window.electronAPI.llmConfigure({ provider, apiKey, model, baseUrl: baseUrl || undefined })
+    // 只发非空字段，让后端 merge 时不会被空值覆盖
+    const update: Record<string, unknown> = { provider, model }
+    if (apiKey) update.apiKey = apiKey
+    if (baseUrl) update.baseUrl = baseUrl
+    await window.electronAPI.llmConfigure(update)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }

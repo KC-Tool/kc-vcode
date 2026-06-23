@@ -1,5 +1,6 @@
 import React from 'react'
 import { useEditorContext } from '../contexts/EditorContext'
+import { useEditorUI } from '../contexts/EditorUIContext'
 
 interface StatusBarProps {
   onToggleTerminal: () => void
@@ -8,6 +9,7 @@ interface StatusBarProps {
 
 export default React.memo(function StatusBar({ onToggleTerminal, onOpenShortcuts }: StatusBarProps) {
   const { state, setTheme } = useEditorContext()
+  const { zoomLevel } = useEditorUI()
   const activeFile = state.activeTabId ? state.files[state.activeTabId] : null
 
   const toggleTheme = () => {
@@ -55,7 +57,7 @@ export default React.memo(function StatusBar({ onToggleTerminal, onOpenShortcuts
         </span>
         <span className="status-separator" />
         <span className="status-item">
-          {Math.round(state.zoomLevel * 100)}%
+          {Math.round(zoomLevel * 100)}%
         </span>
         <span className="status-separator" />
         <span className="status-item">kc-vcode</span>

@@ -1,12 +1,13 @@
 import React from 'react'
 import { useEditorContext } from '../contexts/EditorContext'
+import { useEditorUI } from '../contexts/EditorUIContext'
 
 const SEV_ICON: Record<string, string> = { error: '✕', warning: '▲', info: '●', hint: '○' }
 const SEV_CLASS: Record<string, string> = { error: 'pm-error', warning: 'pm-warn', info: 'pm-info', hint: 'pm-hint' }
 
 function ProblemsPanelInner() {
   const { state, setActiveTab } = useEditorContext()
-  const markers = state?.markers ?? []
+  const { markers } = useEditorUI()
   const errCount = markers.filter(m => m.severity === 'error').length
   const warnCount = markers.filter(m => m.severity === 'warning').length
 

@@ -1,6 +1,7 @@
 import React, { useRef, useCallback, useEffect, useState } from 'react'
 import Editor, { OnMount } from '@monaco-editor/react'
 import { useEditorContext } from '../contexts/EditorContext'
+import { useEditorUI } from '../contexts/EditorUIContext'
 import { useSettings } from '../contexts/SettingsContext'
 import MarkdownPreview from './MarkdownPreview'
 import SettingsView from './SettingsView'
@@ -30,7 +31,8 @@ interface CursorPosition {
 }
 
 export default function EditorPane() {
-  const { state, updateContent, markSaved, setCursor, setMarkers } = useEditorContext()
+  const { state, updateContent, markSaved, setCursor } = useEditorContext()
+  const { setMarkers } = useEditorUI()
   const { settings } = useSettings()
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null)
   const monacoRef = useRef<any>(null)
@@ -198,57 +200,6 @@ export default function EditorPane() {
       }
     })
 
-    // AI Inline Completion (Ghost Text)
-    let completionTimer: ReturnType<typeof setTimeout> | null = null
-    let abortController: AbortController | null = null
-
-    monaco.languages.registerInlineCompletionsProvider('*', {
-      provideInlineCompletions: async (model, position, context, token) => {
-        // debounce: wait 400ms after last keystroke
-        if (completionTimer) clearTimeout(completionTimer)
-
-        // abort any in-flight request
-        if (abortController) abortController.abort()
-        abortController = new AbortController()
-
-        const prompt = model.getValueInRange({
-          startLineNumber: Math.max(1, position.lineNumber - 30),
-          startColumn: 1,
-          endLineNumber: position.lineNumber,
-          endColumn: position.column
-        })
-
-        if (!prompt.trim()) return { items: [] }
-
-        try {
-          const result = await window.electronAPI.llmComplete({
-            prompt: `Complete the code at the cursor position. Output ONLY the completion text, no explanations, no markdown, no code fences.\n\nLanguage: ${language}\n\nCode context:\n${prompt}\n\nComplete from cursor:`,
-            language
-          })
-
-          if ('error' in result || !result.completion) return { items: [] }
-
-          const completion = result.completion.replace(/^\n+/, '')
-          if (!completion) return { items: [] }
-
-          return {
-            items: [{
-              insertText: completion,
-              range: {
-                startLineNumber: position.lineNumber,
-                startColumn: position.column,
-                endLineNumber: position.lineNumber,
-                endColumn: position.column
-              }
-            }]
-          }
-        } catch {
-          return { items: [] }
-        }
-      },
-      freeInlineCompletions: () => {}
-    })
-
     editor.focus()
   }, [activeFile, handleSave, setCursor, setMarkers])
 
@@ -352,26 +303,6 @@ export default function EditorPane() {
     if (editorRef.current && activeFile) editorRef.current.focus()
   }, [state.activeTabId])
 
-  // AI: apply full file edit from /edit command
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const newContent = (e as CustomEvent).detail
-      const editor = editorRef.current
-      const model = editor?.getModel()
-      if (!editor || !model || typeof newContent !== 'string') return
-
-      const fullRange = model.getFullModelRange()
-      editor.executeEdits('ai-edit', [{
-        range: fullRange,
-        text: newContent,
-        forceMoveMarkers: true
-      }])
-      editor.focus()
-    }
-    document.addEventListener('ai:applyEdit', handler)
-    return () => document.removeEventListener('ai:applyEdit', handler)
-  }, [state.activeTabId])
-
   // sync theme
   useEffect(() => {
     const monaco = monacoRef.current
@@ -397,25 +328,6 @@ export default function EditorPane() {
     }
     document.addEventListener('editor:goToLine', handler)
     return () => document.removeEventListener('editor:goToLine', handler)
-  }, [state.activeTabId])
-
-  // AI: insert code from chat
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const code = (e as CustomEvent).detail
-      const editor = editorRef.current
-      if (!editor || typeof code !== 'string') return
-      const pos = editor.getPosition()
-      if (!pos) return
-      editor.executeEdits('ai-insert', [{
-        range: { startLineNumber: pos.lineNumber, startColumn: pos.column, endLineNumber: pos.lineNumber, endColumn: pos.column },
-        text: code,
-        forceMoveMarkers: true
-      }])
-      editor.focus()
-    }
-    document.addEventListener('ai:insertCode', handler)
-    return () => document.removeEventListener('ai:insertCode', handler)
   }, [state.activeTabId])
 
   // settings tab

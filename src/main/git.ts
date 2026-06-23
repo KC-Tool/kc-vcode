@@ -1,15 +1,23 @@
-import { exec } from 'node:child_process'
-import { promisify } from 'node:util'
+import path from 'node:path'
+import simpleGit, { SimpleGit, StatusResult, LogResult, BranchSummary } from 'simple-git'
 
-const execAsync = promisify(exec)
+const gitCache = new Map<string, SimpleGit>()
 
-async function git(cwd: string, cmd: string): Promise<string> {
-  try {
-    const { stdout } = await execAsync(`git ${cmd}`, { cwd, timeout: 10000 })
-    return stdout.trim()
-  } catch {
-    return ''
+function g(cwd: string): SimpleGit {
+  let inst = gitCache.get(cwd)
+  if (!inst) {
+    inst = simpleGit({
+      baseDir: path.resolve(cwd),
+      binary: 'git',
+      maxConcurrentProcesses: 6
+    })
+    gitCache.set(cwd, inst)
   }
+  return inst
+}
+
+function dropGit(cwd: string): void {
+  gitCache.delete(cwd)
 }
 
 export interface GitStatus {
@@ -26,120 +34,129 @@ export interface GitLogEntry {
   date: string
 }
 
+function mapFile(f: StatusResult['files'][number]): { status: string; staged: boolean } {
+  const idx = f.index
+  const wd = f.working_dir
+  if (idx === '?' && wd === '?') return { status: 'untracked', staged: false }
+  if (idx === 'R') return { status: 'renamed', staged: true }
+  if (idx === 'C') return { status: 'copied', staged: true }
+  if (idx === 'A') return { status: 'added', staged: true }
+  if (idx === 'D' || wd === 'D') return { status: 'deleted', staged: idx === 'D' }
+  const staged = !!idx && idx !== ' ' && idx !== '?'
+  return { status: 'modified', staged }
+}
+
 export async function getStatus(cwd: string): Promise<GitStatus> {
-  const branch = await git(cwd, 'rev-parse --abbrev-ref HEAD 2>/dev/null || echo "detached"')
-  const raw = await git(cwd, 'status --porcelain -u')
-  const files = raw.split('\n').filter(Boolean).map(line => {
-    const staged = line[0] !== ' ' && line[0] !== '?'
-    const unstaged = line[1] !== ' '
-    const filePath = line.substring(3)
-    let status = 'modified'
-    if (line[0] === '?' && line[1] === '?') status = 'untracked'
-    else if (line[0] === 'A') status = 'added'
-    else if (line[0] === 'D' || line[1] === 'D') status = 'deleted'
-    else if (line[0] === 'R') status = 'renamed'
-    else if (line[0] === 'C') status = 'copied'
-    return { path: filePath, status, staged }
-  })
-
-  const aheadStr = await git(cwd, 'rev-list --count @{u}..HEAD 2>/dev/null')
-  const behindStr = await git(cwd, 'rev-list --count HEAD..@{u} 2>/dev/null')
-
+  const s = await g(cwd).status()
   return {
-    branch,
-    files,
-    ahead: parseInt(aheadStr) || 0,
-    behind: parseInt(behindStr) || 0
+    branch: s.current || 'detached',
+    files: s.files.map(f => ({ path: f.path, ...mapFile(f) })),
+    ahead: s.ahead || 0,
+    behind: s.behind || 0
   }
 }
 
 export async function getDiff(cwd: string, filePath?: string): Promise<string> {
-  const fileArg = filePath ? ` -- "${filePath}"` : ''
-  return git(cwd, `diff${fileArg}`)
+  return filePath
+    ? g(cwd).raw(['diff', '--', filePath])
+    : g(cwd).raw(['diff'])
+}
+
+interface LogFields {
+  hash: string
+  message: string
+  author: string
+  date: string
 }
 
 export async function getLog(cwd: string, count = 20): Promise<GitLogEntry[]> {
-  const raw = await git(cwd, `log --pretty=format:"%H|%s|%an|%ai" -n ${count}`)
-  if (!raw) return []
-  return raw.split('\n').filter(Boolean).map(line => {
-    const [hash, message, author, date] = line.split('|')
-    return { hash: hash || '', message: message || '', author: author || '', date: date || '' }
+  const log: LogResult<LogFields> = await g(cwd).log({
+    n: count,
+    format: { hash: '%H', message: '%s', author: '%an', date: '%ai' }
   })
+  const all = (log.all || []) as ReadonlyArray<LogFields>
+  return all.map(e => ({
+    hash: e.hash || '',
+    message: e.message || '',
+    author: e.author || '',
+    date: e.date || ''
+  }))
 }
 
 export async function stageFile(cwd: string, filePath: string): Promise<void> {
-  await git(cwd, `add "${filePath}"`)
+  await g(cwd).add(filePath)
 }
 
 export async function unstageFile(cwd: string, filePath: string): Promise<void> {
-  await git(cwd, `reset HEAD "${filePath}"`)
+  await g(cwd).reset(['HEAD', '--', filePath])
 }
 
 export async function commit(cwd: string, message: string): Promise<string> {
-  return git(cwd, `commit -m "${message.replace(/"/g, '\\"')}"`)
+  const res = await g(cwd).commit(message)
+  return res.commit || ''
 }
 
 export async function discardFile(cwd: string, filePath: string): Promise<void> {
-  await git(cwd, `checkout -- "${filePath}"`)
+  await g(cwd).checkout(filePath)
 }
 
 export async function getBranches(cwd: string): Promise<string[]> {
-  const raw = await git(cwd, 'branch --format=%(refname:short)')
-  return raw.split('\n').filter(Boolean)
+  const b: BranchSummary = await g(cwd).branch()
+  return b.all
 }
 
 export async function getCurrentBranch(cwd: string): Promise<string> {
-  return git(cwd, 'rev-parse --abbrev-ref HEAD') || 'HEAD'
+  const b = await g(cwd).branch()
+  return b.current || 'HEAD'
 }
 
 export async function push(cwd: string): Promise<string> {
-  return git(cwd, 'push')
+  return g(cwd).raw(['push'])
 }
 
 export async function pull(cwd: string): Promise<string> {
-  return git(cwd, 'pull')
+  return g(cwd).raw(['pull'])
 }
 
 export async function stash(cwd: string): Promise<string> {
-  return git(cwd, 'stash')
+  return g(cwd).raw(['stash'])
 }
 
 export async function stashPop(cwd: string): Promise<string> {
-  return git(cwd, 'stash pop')
+  return g(cwd).raw(['stash', 'pop'])
 }
 
 export async function checkout(cwd: string, branch: string): Promise<string> {
-  return git(cwd, `checkout "${branch}"`)
+  return g(cwd).raw(['checkout', branch])
 }
 
 export async function createBranch(cwd: string, name: string): Promise<string> {
-  return git(cwd, `checkout -b "${name}"`)
+  return g(cwd).raw(['checkout', '-b', name])
 }
 
 export async function getDiffStat(cwd: string): Promise<{ file: string; additions: number; deletions: number }[]> {
-  const raw = await git(cwd, 'diff --numstat')
-  if (!raw) return []
-  return raw.split('\n').filter(Boolean).map(line => {
+  const out = await g(cwd).raw(['diff', '--numstat'])
+  if (!out) return []
+  return out.split('\n').filter(Boolean).map(line => {
     const [add, del, file] = line.split('\t')
     return { file, additions: parseInt(add) || 0, deletions: parseInt(del) || 0 }
   })
 }
 
 export async function getBlame(cwd: string, filePath: string): Promise<{ line: number; author: string; date: string; content: string }[]> {
-  const raw = await git(cwd, `blame --porcelain "${filePath}"`)
-  if (!raw) return []
-  const lines = raw.split('\n')
+  const out = await g(cwd).raw(['blame', '--porcelain', '--', filePath])
+  if (!out) return []
+  const lines = out.split('\n')
   const result: { line: number; author: string; date: string; content: string }[] = []
   let i = 0
   let lineNum = 1
   while (i < lines.length) {
     const line = lines[i]
     if (/^[0-9a-f]{40}/.test(line)) {
-      const hash = line.split(' ')[0]
+      i++
       let author = ''
       let date = ''
-      i++
-      while (i < lines.length && !lines[i].match(/^[0-9a-f]{40}/)) {
+      while (i < lines.length && !/^[0-9a-f]{40}/.test(lines[i])) {
         if (lines[i].startsWith('author ')) author = lines[i].substring(7)
         if (lines[i].startsWith('author-time ')) {
           const ts = parseInt(lines[i].substring(12))
@@ -155,4 +172,8 @@ export async function getBlame(cwd: string, filePath: string): Promise<{ line: n
     }
   }
   return result
+}
+
+export function clearGitCache(): void {
+  for (const cwd of gitCache.keys()) dropGit(cwd)
 }
