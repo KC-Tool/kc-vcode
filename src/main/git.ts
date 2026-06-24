@@ -1,4 +1,5 @@
 import path from 'node:path'
+import fs from 'node:fs'
 import simpleGit, { SimpleGit, StatusResult, LogResult, BranchSummary } from 'simple-git'
 
 const gitCache = new Map<string, SimpleGit>()
@@ -18,6 +19,18 @@ function g(cwd: string): SimpleGit {
 
 function dropGit(cwd: string): void {
   gitCache.delete(cwd)
+}
+
+export function findGitRoot(filePath: string): string | null {
+  let dir = path.dirname(path.resolve(filePath))
+  const root = path.parse(dir).root
+  while (dir !== root) {
+    if (fs.existsSync(path.join(dir, '.git'))) return dir
+    const parent = path.dirname(dir)
+    if (parent === dir) break
+    dir = parent
+  }
+  return null
 }
 
 export interface GitStatus {
@@ -92,8 +105,31 @@ export async function unstageFile(cwd: string, filePath: string): Promise<void> 
 }
 
 export async function commit(cwd: string, message: string): Promise<string> {
-  const res = await g(cwd).commit(message)
-  return res.commit || ''
+  // -S 走 user.signingkey，没配就报错，不静默
+  const res = await g(cwd).raw(['commit', '-S', '-m', message])
+  return res.trim()
+}
+
+export async function stageAndCommit(
+  cwd: string,
+  filePath: string,
+  message?: string
+): Promise<{ committed: boolean; output: string }> {
+  const git = g(cwd)
+  const rel = path.relative(cwd, filePath)
+  if (rel.startsWith('..') || path.isAbsolute(rel)) {
+    return { committed: false, output: 'outside repo' }
+  }
+
+  await git.add(rel)
+
+  // 内容没变就别瞎提交
+  const staged = await git.raw(['diff', '--cached', '--name-only'])
+  if (!staged.trim()) return { committed: false, output: 'no changes' }
+
+  const msg = message || `更新 ${path.basename(filePath)}`
+  const out = await git.raw(['commit', '-S', '-m', msg])
+  return { committed: true, output: out.trim() }
 }
 
 export async function discardFile(cwd: string, filePath: string): Promise<void> {

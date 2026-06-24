@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
 import { readDirRecursive, getCurrentDir, switchDir, getLanguage } from '../fileTree'
+import { findGitRoot, stageAndCommit } from '../git'
 
 export function registerFileIpc(): void {
   ipcMain.handle('file:open', async (_, filePath: string) => {
@@ -16,6 +17,18 @@ export function registerFileIpc(): void {
   ipcMain.handle('file:save', async (_, data: { path: string; content: string }) => {
     try {
       fs.writeFileSync(data.path, data.content, 'utf-8')
+
+      // 顺手签个 commit，不阻塞保存结果
+      const repoRoot = findGitRoot(data.path)
+      if (repoRoot) {
+        try {
+          await stageAndCommit(repoRoot, data.path)
+        } catch (gitErr) {
+          // GPG 没配 / 在 merge 状态 / 别的都别砸了保存
+          console.warn('[auto-commit]', data.path, gitErr)
+        }
+      }
+
       return { success: true }
     } catch (err: unknown) {
       return { error: err instanceof Error ? err.message : String(err) }
