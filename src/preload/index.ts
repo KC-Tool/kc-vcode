@@ -8,6 +8,101 @@ export interface FileNode {
   language?: string
 }
 
+export interface GitUser {
+  name: string
+  email: string
+}
+
+export interface GitFileChange {
+  path: string
+  oldPath?: string
+  status: 'added' | 'modified' | 'deleted' | 'renamed' | 'copied' | 'untracked' | 'conflicted' | 'type-changed'
+  staged: boolean
+}
+
+export interface GitStatus {
+  initialized: boolean
+  branch: string
+  upstream?: string
+  ahead: number
+  behind: number
+  staged: GitFileChange[]
+  unstaged: GitFileChange[]
+  untracked: GitFileChange[]
+  conflicts: GitFileChange[]
+  user?: GitUser
+}
+
+export interface GitLogEntry {
+  hash: string
+  shortHash: string
+  message: string
+  body: string
+  author: string
+  authorEmail: string
+  date: string
+  parents: string[]
+  refs: string[]
+}
+
+export interface DiffLine {
+  type: 'add' | 'del' | 'context'
+  content: string
+  oldLine?: number
+  newLine?: number
+}
+
+export interface DiffHunk {
+  oldStart: number
+  oldLines: number
+  newStart: number
+  newLines: number
+  lines: DiffLine[]
+}
+
+export interface FileDiff {
+  file: string
+  oldPath?: string
+  isBinary: boolean
+  hunks: DiffHunk[]
+}
+
+export interface GitRemote {
+  name: string
+  fetchUrl: string
+  pushUrl: string
+}
+
+export interface GitBranch {
+  name: string
+  current: boolean
+  remote?: string
+  isHead: boolean
+}
+
+export interface GitStash {
+  index: number
+  ref: string
+  message: string
+  branch?: string
+}
+
+export interface GitBlameLine {
+  line: number
+  hash: string
+  shortHash: string
+  author: string
+  date: string
+  content: string
+}
+
+export interface CommitResult {
+  hash: string
+  shortHash: string
+  branch: string
+  summary: string
+}
+
 export interface ElectronAPI {
   openDirectory: () => Promise<{
     rootName: string
@@ -44,22 +139,49 @@ export interface ElectronAPI {
   renameFile: (oldPath: string, newName: string) => Promise<{ success?: boolean; newPath?: string; error?: string }>
   moveFile: (sourcePath: string, targetPath: string) => Promise<{ success?: boolean; error?: string }>
   clipboardWriteText: (text: string) => Promise<void>
-  gitStatus: (cwd: string) => Promise<any>
-  gitDiff: (cwd: string, filePath?: string) => Promise<string>
-  gitLog: (cwd: string, count?: number) => Promise<any[]>
-  gitStage: (cwd: string, filePath: string) => Promise<void>
-  gitUnstage: (cwd: string, filePath: string) => Promise<void>
-  gitCommit: (cwd: string, message: string) => Promise<string>
-  gitDiscard: (cwd: string, filePath: string) => Promise<void>
-  gitBranches: (cwd: string) => Promise<string[]>
-  gitPush: (cwd: string) => Promise<string>
-  gitPull: (cwd: string) => Promise<string>
-  gitStash: (cwd: string) => Promise<string>
-  gitStashPop: (cwd: string) => Promise<string>
-  gitCheckout: (cwd: string, branch: string) => Promise<string>
-  gitCreateBranch: (cwd: string, name: string) => Promise<string>
-  gitDiffStat: (cwd: string) => Promise<any[]>
-  gitBlame: (cwd: string, filePath: string) => Promise<any[]>
+  gitState: (cwd: string) => Promise<GitStatus>
+  gitLog: (cwd: string, count?: number, branch?: string) => Promise<GitLogEntry[]>
+  gitCommit: (cwd: string, message: string, opts?: { amend?: boolean; signOff?: boolean; noVerify?: boolean; allowEmpty?: boolean }) => Promise<CommitResult>
+  gitDiffWorking: (cwd: string, file: string) => Promise<FileDiff>
+  gitDiffStaged: (cwd: string, file: string) => Promise<FileDiff>
+  gitDiffWorkingAll: (cwd: string) => Promise<FileDiff[]>
+  gitDiffStagedAll: (cwd: string) => Promise<FileDiff[]>
+  gitDiffCommit: (cwd: string, hash: string) => Promise<FileDiff[]>
+  gitFileAtCommit: (cwd: string, hash: string, file: string) => Promise<string | null>
+  gitStage: (cwd: string, paths: string[]) => Promise<void>
+  gitStageAll: (cwd: string) => Promise<void>
+  gitUnstage: (cwd: string, paths: string[]) => Promise<void>
+  gitUnstageAll: (cwd: string) => Promise<void>
+  gitDiscard: (cwd: string, paths: string[]) => Promise<void>
+  gitDiscardUntracked: (cwd: string, paths: string[]) => Promise<void>
+  gitBranches: (cwd: string) => Promise<{ current: string; local: GitBranch[]; remote: GitBranch[] }>
+  gitCheckout: (cwd: string, target: string, create?: boolean) => Promise<string>
+  gitCreateBranch: (cwd: string, name: string, startPoint?: string) => Promise<string>
+  gitDeleteBranch: (cwd: string, name: string, force?: boolean) => Promise<string>
+  gitRemotes: (cwd: string) => Promise<GitRemote[]>
+  gitAddRemote: (cwd: string, name: string, url: string) => Promise<void>
+  gitRemoveRemote: (cwd: string, name: string) => Promise<void>
+  gitPush: (cwd: string, opts?: { remote?: string; branch?: string; setUpstream?: boolean; force?: boolean; forceWithLease?: boolean; tags?: boolean }) => Promise<string>
+  gitPull: (cwd: string, opts?: { remote?: string; branch?: string; rebase?: boolean; ffOnly?: boolean }) => Promise<string>
+  gitFetch: (cwd: string, opts?: { remote?: string; prune?: boolean; all?: boolean }) => Promise<string>
+  gitStashList: (cwd: string) => Promise<GitStash[]>
+  gitStashSave: (cwd: string, message?: string, includeUntracked?: boolean) => Promise<string>
+  gitStashPop: (cwd: string, index?: number) => Promise<string>
+  gitStashApply: (cwd: string, index?: number) => Promise<string>
+  gitStashDrop: (cwd: string, index?: number) => Promise<string>
+  gitBlame: (cwd: string, file: string) => Promise<GitBlameLine[]>
+  gitUser: (cwd: string) => Promise<GitUser | undefined>
+  gitSetUser: (cwd: string, name: string, email: string) => Promise<void>
+  gitInit: (cwd: string) => Promise<void>
+  gitIsRepo: (cwd: string) => Promise<boolean>
+  gitRaw: (cwd: string, args: string[]) => Promise<string>
+  gitFindRoot: (filePath: string) => Promise<string | null>
+  onViewSourceControl: (cb: () => void) => void
+  onGitMenuCommit: (cb: () => void) => void
+  onGitMenuPush: (cb: () => void) => void
+  onGitMenuPull: (cb: () => void) => void
+  onGitMenuFetch: (cb: () => void) => void
+  onGitMenuInit: (cb: () => void) => void
   lspHover: (params: { filePath: string; content: string; line: number; column: number }) => Promise<any>
   lspDefinition: (params: { filePath: string; content: string; line: number; column: number }) => Promise<any>
   lspReferences: (params: { filePath: string; content: string; line: number; column: number }) => Promise<any>
@@ -81,9 +203,6 @@ export interface ElectronAPI {
   onDebugTerminated: (cb: () => void) => void
   onDebugExited: (cb: (body: any) => void) => void
   removeAllDebugListeners: () => void
-  llmGetConfig: () => Promise<Record<string, unknown> | null>
-  llmConfigure: (config: Record<string, unknown>) => Promise<boolean>
-  llmChat: (req: { messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>; temperature?: number; maxTokens?: number }) => Promise<string>
 }
 
 declare global {
@@ -184,22 +303,54 @@ const electronAPI = {
   clipboardWriteText: (text: string): Promise<void> =>
     ipcRenderer.invoke('clipboard:writeText', text),
 
-  gitStatus: (cwd: string) => ipcRenderer.invoke('git:status', cwd),
-  gitDiff: (cwd: string, filePath?: string) => ipcRenderer.invoke('git:diff', cwd, filePath),
-  gitLog: (cwd: string, count?: number) => ipcRenderer.invoke('git:log', cwd, count),
-  gitStage: (cwd: string, filePath: string) => ipcRenderer.invoke('git:stage', cwd, filePath),
-  gitUnstage: (cwd: string, filePath: string) => ipcRenderer.invoke('git:unstage', cwd, filePath),
-  gitCommit: (cwd: string, message: string) => ipcRenderer.invoke('git:commit', cwd, message),
-  gitDiscard: (cwd: string, filePath: string) => ipcRenderer.invoke('git:discard', cwd, filePath),
+  gitState: (cwd: string) => ipcRenderer.invoke('git:state', cwd),
+  gitLog: (cwd: string, count?: number, branch?: string) => ipcRenderer.invoke('git:log', cwd, count, branch),
+  gitCommit: (cwd: string, message: string, opts?: { amend?: boolean; signOff?: boolean; noVerify?: boolean; allowEmpty?: boolean }) =>
+    ipcRenderer.invoke('git:commit', cwd, message, opts),
+  gitDiffWorking: (cwd: string, file: string) => ipcRenderer.invoke('git:diffWorking', cwd, file),
+  gitDiffStaged: (cwd: string, file: string) => ipcRenderer.invoke('git:diffStaged', cwd, file),
+  gitDiffWorkingAll: (cwd: string) => ipcRenderer.invoke('git:diffWorkingAll', cwd),
+  gitDiffStagedAll: (cwd: string) => ipcRenderer.invoke('git:diffStagedAll', cwd),
+  gitDiffCommit: (cwd: string, hash: string) => ipcRenderer.invoke('git:diffCommit', cwd, hash),
+  gitFileAtCommit: (cwd: string, hash: string, file: string) => ipcRenderer.invoke('git:fileAtCommit', cwd, hash, file),
+  gitStage: (cwd: string, paths: string[]) => ipcRenderer.invoke('git:stage', cwd, paths),
+  gitStageAll: (cwd: string) => ipcRenderer.invoke('git:stageAll', cwd),
+  gitUnstage: (cwd: string, paths: string[]) => ipcRenderer.invoke('git:unstage', cwd, paths),
+  gitUnstageAll: (cwd: string) => ipcRenderer.invoke('git:unstageAll', cwd),
+  gitDiscard: (cwd: string, paths: string[]) => ipcRenderer.invoke('git:discard', cwd, paths),
+  gitDiscardUntracked: (cwd: string, paths: string[]) => ipcRenderer.invoke('git:discardUntracked', cwd, paths),
   gitBranches: (cwd: string) => ipcRenderer.invoke('git:branches', cwd),
-  gitPush: (cwd: string) => ipcRenderer.invoke('git:push', cwd),
-  gitPull: (cwd: string) => ipcRenderer.invoke('git:pull', cwd),
-  gitStash: (cwd: string) => ipcRenderer.invoke('git:stash', cwd),
-  gitStashPop: (cwd: string) => ipcRenderer.invoke('git:stashPop', cwd),
-  gitCheckout: (cwd: string, branch: string) => ipcRenderer.invoke('git:checkout', cwd, branch),
-  gitCreateBranch: (cwd: string, name: string) => ipcRenderer.invoke('git:createBranch', cwd, name),
-  gitDiffStat: (cwd: string) => ipcRenderer.invoke('git:diffStat', cwd),
-  gitBlame: (cwd: string, filePath: string) => ipcRenderer.invoke('git:blame', cwd, filePath),
+  gitCheckout: (cwd: string, target: string, create?: boolean) => ipcRenderer.invoke('git:checkout', cwd, target, create),
+  gitCreateBranch: (cwd: string, name: string, startPoint?: string) => ipcRenderer.invoke('git:createBranch', cwd, name, startPoint),
+  gitDeleteBranch: (cwd: string, name: string, force?: boolean) => ipcRenderer.invoke('git:deleteBranch', cwd, name, force),
+  gitRemotes: (cwd: string) => ipcRenderer.invoke('git:remotes', cwd),
+  gitAddRemote: (cwd: string, name: string, url: string) => ipcRenderer.invoke('git:addRemote', cwd, name, url),
+  gitRemoveRemote: (cwd: string, name: string) => ipcRenderer.invoke('git:removeRemote', cwd, name),
+  gitPush: (cwd: string, opts?: { remote?: string; branch?: string; setUpstream?: boolean; force?: boolean; forceWithLease?: boolean; tags?: boolean }) =>
+    ipcRenderer.invoke('git:push', cwd, opts),
+  gitPull: (cwd: string, opts?: { remote?: string; branch?: string; rebase?: boolean; ffOnly?: boolean }) =>
+    ipcRenderer.invoke('git:pull', cwd, opts),
+  gitFetch: (cwd: string, opts?: { remote?: string; prune?: boolean; all?: boolean }) =>
+    ipcRenderer.invoke('git:fetch', cwd, opts),
+  gitStashList: (cwd: string) => ipcRenderer.invoke('git:stashList', cwd),
+  gitStashSave: (cwd: string, message?: string, includeUntracked?: boolean) => ipcRenderer.invoke('git:stashSave', cwd, message, includeUntracked),
+  gitStashPop: (cwd: string, index?: number) => ipcRenderer.invoke('git:stashPop', cwd, index),
+  gitStashApply: (cwd: string, index?: number) => ipcRenderer.invoke('git:stashApply', cwd, index),
+  gitStashDrop: (cwd: string, index?: number) => ipcRenderer.invoke('git:stashDrop', cwd, index),
+  gitBlame: (cwd: string, file: string) => ipcRenderer.invoke('git:blame', cwd, file),
+  gitUser: (cwd: string) => ipcRenderer.invoke('git:user', cwd),
+  gitSetUser: (cwd: string, name: string, email: string) => ipcRenderer.invoke('git:setUser', cwd, name, email),
+  gitInit: (cwd: string) => ipcRenderer.invoke('git:init', cwd),
+  gitIsRepo: (cwd: string) => ipcRenderer.invoke('git:isRepo', cwd),
+  gitRaw: (cwd: string, args: string[]) => ipcRenderer.invoke('git:raw', cwd, args),
+  gitFindRoot: (filePath: string) => ipcRenderer.invoke('git:findRoot', filePath),
+
+  onViewSourceControl: (cb: () => void) => { ipcRenderer.on('view:sourceControl', () => cb()) },
+  onGitMenuCommit: (cb: () => void) => { ipcRenderer.on('git:menu:commit', () => cb()) },
+  onGitMenuPush: (cb: () => void) => { ipcRenderer.on('git:menu:push', () => cb()) },
+  onGitMenuPull: (cb: () => void) => { ipcRenderer.on('git:menu:pull', () => cb()) },
+  onGitMenuFetch: (cb: () => void) => { ipcRenderer.on('git:menu:fetch', () => cb()) },
+  onGitMenuInit: (cb: () => void) => { ipcRenderer.on('git:menu:init', () => cb()) },
 
   lspHover: (params: { filePath: string; content: string; line: number; column: number }) =>
     ipcRenderer.invoke('lsp:hover', params),
@@ -250,15 +401,6 @@ const electronAPI = {
     ipcRenderer.removeAllListeners('debug:terminated')
     ipcRenderer.removeAllListeners('debug:exited')
   },
-
-  llmGetConfig: (): Promise<Record<string, unknown> | null> =>
-    ipcRenderer.invoke('llm:getConfig'),
-
-  llmConfigure: (config: Record<string, unknown>): Promise<boolean> =>
-    ipcRenderer.invoke('llm:configure', config),
-
-  llmChat: (req: { messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>; temperature?: number; maxTokens?: number }): Promise<string> =>
-    ipcRenderer.invoke('llm:chat', req),
 }
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI)
