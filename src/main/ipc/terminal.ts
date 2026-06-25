@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 import { createPty, writeToPty, resizePty } from '../terminal'
-import { getMainWin } from './mainWindow'
+import { getMainWin } from '../mainWindow'
 
 export function registerTerminalIpc(): void {
   ipcMain.handle('terminal:create', (_, opts?: { cwd?: string }) => {

@@ -2,7 +2,7 @@ import { ipcMain, dialog } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'
 import { readDirRecursive, openFolder, getLanguage } from '../fileTree'
-import { getMainWin } from './mainWindow'
+import { getMainWin } from '../mainWindow'
 
 export function registerDialogIpc(): void {
   ipcMain.handle('dialog:openDirectory', async () => {

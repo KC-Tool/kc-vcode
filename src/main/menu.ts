@@ -257,6 +257,41 @@ export function createMenu(): void {
       ]
     },
     {
+      label: 'Git',
+      submenu: [
+        {
+          label: 'Show Source Control',
+          accelerator: 'CmdOrCtrl+Shift+G',
+          click: () => mainWin?.webContents.send('view:sourceControl')
+        },
+        { type: 'separator' },
+        {
+          label: 'Commit',
+          accelerator: 'CmdOrCtrl+Enter',
+          click: () => mainWin?.webContents.send('git:menu:commit')
+        },
+        {
+          label: 'Push',
+          accelerator: 'CmdOrCtrl+Shift+K',
+          click: () => mainWin?.webContents.send('git:menu:push')
+        },
+        {
+          label: 'Pull',
+          accelerator: 'CmdOrCtrl+Shift+L',
+          click: () => mainWin?.webContents.send('git:menu:pull')
+        },
+        {
+          label: 'Fetch',
+          click: () => mainWin?.webContents.send('git:menu:fetch')
+        },
+        { type: 'separator' },
+        {
+          label: 'Init Repository',
+          click: () => mainWin?.webContents.send('git:menu:init')
+        }
+      ]
+    },
+    {
       label: 'Help',
       submenu: [
         {

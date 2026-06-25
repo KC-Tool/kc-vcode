@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron'
 import { BrowserWindow } from 'electron'
 import { DebugClient } from '../debug'
-import { getMainWin } from './mainWindow'
+import { getMainWin } from '../mainWindow'
 
 export function registerDebugIpc(): void {
   let debugClient: DebugClient | null = null

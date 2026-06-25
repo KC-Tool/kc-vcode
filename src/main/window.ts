@@ -2,7 +2,8 @@ import { BrowserWindow } from 'electron'
 import path from 'node:path'
 import { createMenu } from './menu'
 import { destroyPty } from './terminal'
-import { getCurrentDir, stopWatching } from './fileTree'
+import { getCurrentDir } from './fileTree'
+import { stopWatching } from './watcher'
 import { setMainWin, getMainWin } from './mainWindow'
 
 export function createWindow(): void {

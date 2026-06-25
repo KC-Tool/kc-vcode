@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 import { shell, clipboard } from 'electron'
-import { getMainWin } from './mainWindow'
+import { getMainWin } from '../mainWindow'
 
 export function registerShellIpc(): void {
   ipcMain.handle('shell:revealInFolder', (_, filePath: string) => {

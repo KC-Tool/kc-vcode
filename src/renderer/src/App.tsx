@@ -74,10 +74,41 @@ function AppContent() {
       openFile(data.path, data.name, data.content, data.language)
     })
     window.electronAPI.onDirectoryRefreshed(() => refreshTree())
+
+    window.electronAPI.onViewSourceControl(() => {
+      document.dispatchEvent(new CustomEvent('app:switchView', { detail: 'source-control' }))
+    })
+    window.electronAPI.onGitMenuCommit(() => {
+      document.dispatchEvent(new CustomEvent('app:switchView', { detail: 'source-control' }))
+      document.dispatchEvent(new CustomEvent('git:menu:commit'))
+    })
+    window.electronAPI.onGitMenuPush(() => {
+      document.dispatchEvent(new CustomEvent('app:switchView', { detail: 'source-control' }))
+      document.dispatchEvent(new CustomEvent('git:menu:push'))
+    })
+    window.electronAPI.onGitMenuPull(() => {
+      document.dispatchEvent(new CustomEvent('app:switchView', { detail: 'source-control' }))
+      document.dispatchEvent(new CustomEvent('git:menu:pull'))
+    })
+    window.electronAPI.onGitMenuFetch(() => {
+      document.dispatchEvent(new CustomEvent('app:switchView', { detail: 'source-control' }))
+      document.dispatchEvent(new CustomEvent('git:menu:fetch'))
+    })
+    window.electronAPI.onGitMenuInit(() => {
+      document.dispatchEvent(new CustomEvent('app:switchView', { detail: 'source-control' }))
+      document.dispatchEvent(new CustomEvent('git:menu:init'))
+    })
+
     return () => {
       window.electronAPI.removeAllListeners('directory:opened')
       window.electronAPI.removeAllListeners('file:opened')
       window.electronAPI.removeAllListeners('directory:refreshed')
+      window.electronAPI.removeAllListeners('view:sourceControl')
+      window.electronAPI.removeAllListeners('git:menu:commit')
+      window.electronAPI.removeAllListeners('git:menu:push')
+      window.electronAPI.removeAllListeners('git:menu:pull')
+      window.electronAPI.removeAllListeners('git:menu:fetch')
+      window.electronAPI.removeAllListeners('git:menu:init')
     }
   }, [openFile, setDirectory, refreshTree])
 
