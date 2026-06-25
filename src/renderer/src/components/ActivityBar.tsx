@@ -1,6 +1,6 @@
 import React from 'react'
 
-export type ActivityView = 'explorer' | 'search' | 'source-control' | 'problems' | 'ai-chat'
+export type ActivityView = 'explorer' | 'search' | 'source-control' | 'problems'
 
 interface Props {
   active: ActivityView
@@ -56,20 +56,6 @@ export default function ActivityBar({ active, onSelect, onOpenSettings }: Props)
             <path d="M12 17v.01" />
             <path d="M12 13a2 2 0 00.914-3.782 1.98 1.98 0 00-2.828 0A2 2 0 009 12.999V13a2 2 0 003 2z" />
             <path d="M8.584 14.75A5 5 0 0112 20a5 5 0 003.416-5.25" />
-          </svg>
-        </div>
-        {/* AI Chat */}
-        <div
-          className={`activity-bar-item${active === 'ai-chat' ? ' activity-bar-item--active' : ''}`}
-          onClick={() => onSelect('ai-chat')}
-          title="AI Assistant"
-        >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 2a4 4 0 014 4v1a2 2 0 012 2v1a2 2 0 01-2 2h-1" />
-            <path d="M8 9H6a2 2 0 00-2 2v1a2 2 0 002 2h1" />
-            <path d="M12 18v4" />
-            <path d="M8 22h8" />
-            <circle cx="12" cy="14" r="3" />
           </svg>
         </div>
       </div>

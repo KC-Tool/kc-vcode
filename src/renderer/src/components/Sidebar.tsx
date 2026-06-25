@@ -3,7 +3,6 @@ import FileTree from './FileTree'
 import SearchPanel from './SearchPanel'
 import SourceControl from './SourceControl'
 import ProblemsPanel from './ProblemsPanel'
-import AiChat from './AiChat'
 import ActivityBar, { ActivityView } from './ActivityBar'
 import { FileNode } from '../../../preload/index'
 import { useEditorContext } from '../contexts/EditorContext'
@@ -32,6 +31,15 @@ export default function Sidebar({ tree, onOpenFolder, onRefresh, onOpenSettings,
     }
     document.addEventListener('mousedown', close)
     return () => document.removeEventListener('mousedown', close)
+  }, [])
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const v = (e as CustomEvent<ActivityView>).detail
+      if (v) setView(v)
+    }
+    document.addEventListener('app:switchView', handler)
+    return () => document.removeEventListener('app:switchView', handler)
   }, [])
 
   useEffect(() => {
@@ -123,9 +131,6 @@ export default function Sidebar({ tree, onOpenFolder, onRefresh, onOpenSettings,
         )}
         {view === 'problems' && (
           <ProblemsPanel />
-        )}
-        {view === 'ai-chat' && (
-          <AiChat />
         )}
       </div>
     </div>

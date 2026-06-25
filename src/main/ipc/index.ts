@@ -5,7 +5,6 @@ import { registerGitIpc } from './git'
 import { registerTerminalIpc } from './terminal'
 import { registerLspIpc } from './lsp'
 import { registerDebugIpc } from './debug'
-import { registerLlmIpc } from './llm'
 import { registerShellIpc } from './shell'
 
 export function registerAllIpc(): void {
@@ -16,6 +15,5 @@ export function registerAllIpc(): void {
   registerTerminalIpc()
   registerLspIpc()
   registerDebugIpc()
-  registerLlmIpc()
   registerShellIpc()
 }
